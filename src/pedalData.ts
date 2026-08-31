@@ -36,7 +36,7 @@ function slugify(s: string): string {
 
 export async function loadPedalLibrary(): Promise<LibraryPedal[]> {
   if (cache) return cache;
-  const res = await fetch("/data/pedals.json");
+  const res = await fetch(`${import.meta.env.BASE_URL}data/pedals.json`);
   if (!res.ok) throw new Error(`Failed to load pedal library (${res.status})`);
   const raw: RawPedal[] = await res.json();
 
