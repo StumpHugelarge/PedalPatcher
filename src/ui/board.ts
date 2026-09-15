@@ -3,6 +3,7 @@ import { store, pedalFootprint } from "../store";
 import { clamp } from "../geometry";
 import type { Footprint } from "../geometry";
 import { pedalImageUrl } from "../pedalData";
+import { pedalboardImageUrl } from "../pedalboardData";
 import { onDrop } from "../dragState";
 import type { LibraryPedal, PlacedPedal, Connection, CableType, JackKind } from "../types";
 
@@ -30,6 +31,18 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
   root.appendChild(scroll);
 
   let scale = 40;
+
+  // While a pedal is actively being dragged, `render()` skips the normal
+  // full rebuild and instead repositions just that pedal (see reposition()
+  // below). A full rebuild mid-drag replaces the dragged element's DOM
+  // node, which silently drops its pointer capture — the browser then has
+  // nowhere reliable to deliver the eventual pointerup/pointercancel, so
+  // the drag can appear "stuck" and never release. These maps hold
+  // references from the last full render so reposition() can find them.
+  let draggingPedalId: string | null = null;
+  let pedalEls = new Map<string, HTMLElement>();
+  let jackEls = new Map<string, HTMLElement>();
+  let connectionLineEls = new Map<string, SVGPolylineElement>();
 
   new ResizeObserver(() => render()).observe(root);
 
@@ -60,9 +73,17 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
   }
 
   function render() {
+    if (draggingPedalId) {
+      reposition(draggingPedalId);
+      return;
+    }
+
     const board = store.getActiveBoard();
     scale = computeScale(board);
     clear(scroll);
+    pedalEls = new Map();
+    jackEls = new Map();
+    connectionLineEls = new Map();
 
     const surface = el("div", {
       class: "board-surface",
@@ -70,11 +91,24 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
     });
     scroll.appendChild(surface);
 
+    if (board.image) {
+      surface.appendChild(
+        el("img", {
+          class: "board-surface-image",
+          src: pedalboardImageUrl(board.image),
+          alt: "",
+          draggable: false,
+        })
+      );
+    }
+
     const footprints = board.pedals.map((p) => ({ pedal: p, fp: pedalFootprint(p, opts.library) }));
     const collisions = findCollisions(footprints, board.widthIn, board.heightIn);
 
     for (const { pedal, fp } of footprints) {
-      surface.appendChild(renderPedal(pedal, fp, collisions.has(pedal.id)));
+      const outer = renderPedal(pedal, fp, collisions.has(pedal.id));
+      pedalEls.set(pedal.id, outer);
+      surface.appendChild(outer);
     }
 
     const svg = svgEl("svg", {
@@ -86,7 +120,10 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
 
     for (const conn of board.connections) {
       const line = renderConnection(conn, board.pedals);
-      if (line) svg.appendChild(line);
+      if (line) {
+        connectionLineEls.set(conn.id, line);
+        svg.appendChild(line);
+      }
     }
 
     const pending = store.pending;
@@ -121,8 +158,12 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
     }
 
     for (const { pedal, fp } of footprints) {
-      surface.appendChild(renderJack(pedal.id, "input", fp.inputIn));
-      surface.appendChild(renderJack(pedal.id, "output", fp.outputIn));
+      const inputDot = renderJack(pedal.id, "input", fp.inputIn);
+      const outputDot = renderJack(pedal.id, "output", fp.outputIn);
+      jackEls.set(`${pedal.id}:input`, inputDot);
+      jackEls.set(`${pedal.id}:output`, outputDot);
+      surface.appendChild(inputDot);
+      surface.appendChild(outputDot);
     }
 
     surface.addEventListener("pointerdown", (e) => {
@@ -141,6 +182,49 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
         store.clearSelection();
       }
     });
+  }
+
+  // Lightweight mid-drag update: moves the already-existing DOM nodes for
+  // one pedal (its body, its two jacks, and any snapped cables touching it)
+  // without tearing down and recreating anything — see the note by
+  // draggingPedalId above for why that matters.
+  function reposition(pedalId: string) {
+    const board = store.getActiveBoard();
+    const pedal = board.pedals.find((p) => p.id === pedalId);
+    if (!pedal) return;
+    const fp = pedalFootprint(pedal, opts.library);
+
+    const outer = pedalEls.get(pedalId);
+    if (outer) {
+      outer.style.left = `${pedal.xIn * scale}px`;
+      outer.style.top = `${pedal.yIn * scale}px`;
+    }
+
+    const inputDot = jackEls.get(`${pedalId}:input`);
+    if (inputDot) {
+      inputDot.style.left = `${fp.inputIn.xIn * scale}px`;
+      inputDot.style.top = `${fp.inputIn.yIn * scale}px`;
+    }
+    const outputDot = jackEls.get(`${pedalId}:output`);
+    if (outputDot) {
+      outputDot.style.left = `${fp.outputIn.xIn * scale}px`;
+      outputDot.style.top = `${fp.outputIn.yIn * scale}px`;
+    }
+
+    for (const conn of board.connections) {
+      if (conn.mode !== "snapped" || !conn.from || !conn.to) continue;
+      if (conn.from.pedalId !== pedalId && conn.to.pedalId !== pedalId) continue;
+      const line = connectionLineEls.get(conn.id);
+      if (!line) continue;
+      const fromPedal = board.pedals.find((p) => p.id === conn.from!.pedalId);
+      const toPedal = board.pedals.find((p) => p.id === conn.to!.pedalId);
+      if (!fromPedal || !toPedal) continue;
+      const fromFp = pedalFootprint(fromPedal, opts.library);
+      const toFp = pedalFootprint(toPedal, opts.library);
+      const p1 = conn.from.jack === "input" ? fromFp.inputIn : fromFp.outputIn;
+      const p2 = conn.to.jack === "input" ? toFp.inputIn : toFp.outputIn;
+      line.setAttribute("points", `${p1.xIn * scale},${p1.yIn * scale} ${p2.xIn * scale},${p2.yIn * scale}`);
+    }
   }
 
   function renderPedal(pedal: PlacedPedal, fp: Footprint, hasCollision: boolean) {
@@ -212,6 +296,7 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       const dyIn = (e.clientY - dragStart.y) / scale;
       if (Math.abs(dxIn) + Math.abs(dyIn) > 0.02) moved = true;
       if (!moved) return;
+      draggingPedalId = pedal.id;
       latestMove = { xIn: dragStart.origXIn + dxIn, yIn: dragStart.origYIn + dyIn };
       if (!rafPending) {
         rafPending = true;
@@ -222,12 +307,25 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       }
     });
 
-    outer.addEventListener("pointerup", () => {
-      if (dragStart && !moved) {
+    function endDrag(wasComplete: boolean) {
+      if (wasComplete && dragStart && !moved) {
         store.select({ type: "pedal", id: pedal.id });
       }
       dragStart = null;
-    });
+      const wasDragging = draggingPedalId === pedal.id;
+      draggingPedalId = null;
+      // The drag is over, so it's now safe to let a full rebuild recreate
+      // this node (recomputes collision highlighting, etc). Skipped when
+      // nothing actually moved to avoid an unnecessary extra render.
+      if (wasDragging) render();
+    }
+
+    outer.addEventListener("pointerup", () => endDrag(true));
+    // Touch/pen gestures (and some trackpad interactions) can be cancelled
+    // by the browser mid-gesture — without handling this, dragStart/
+    // draggingPedalId would stay set forever, which reads as the pedal
+    // refusing to let go.
+    outer.addEventListener("pointercancel", () => endDrag(false));
 
     return outer;
   }

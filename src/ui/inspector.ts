@@ -2,13 +2,19 @@ import { el, clear } from "../dom";
 import { store } from "../store";
 import { nextRotation } from "../geometry";
 import { cableStyle } from "./board";
+import { pedalboardImageUrl, searchPedalboards } from "../pedalboardData";
 import type { CableType, LibraryPedal } from "../types";
 
 const CABLE_TYPES: CableType[] = ["instrument", "patch", "send-return", "midi", "power"];
 
-export function createInspector(root: HTMLElement, library: Map<string, LibraryPedal>) {
+export function createInspector(
+  root: HTMLElement,
+  library: Map<string, LibraryPedal>,
+  boardLibrary: LibraryPedal[]
+) {
   const panel = el("div", { class: "inspector-panel" });
   root.appendChild(panel);
+  let boardImageQuery = "";
 
   function render() {
     clear(panel);
@@ -123,12 +129,81 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
     wrap.appendChild(heightInput);
     wrap.appendChild(el("label", { class: "field-label" }, ["Board color"]));
     wrap.appendChild(colorInput);
+
+    wrap.appendChild(el("label", { class: "field-label" }, ["Board case image"]));
+    if (board.image) {
+      const clearBtn = el("button", { class: "secondary-btn" }, ["Remove image"]);
+      clearBtn.addEventListener("click", () => store.updateBoardMeta({ image: null }));
+      wrap.appendChild(
+        el("div", { class: "board-image-current" }, [
+          el("img", { src: pedalboardImageUrl(board.image), alt: "" }),
+          clearBtn,
+        ])
+      );
+    } else {
+      const searchInput = el("input", {
+        type: "search",
+        placeholder: "Search brand or model…",
+        value: boardImageQuery,
+        class: "library-search",
+        oninput: (e: Event) => {
+          boardImageQuery = (e.target as HTMLInputElement).value;
+          renderBoardImageResults();
+        },
+      });
+      wrap.appendChild(searchInput);
+
+      const results = el("div", { class: "library-results" });
+      wrap.appendChild(results);
+
+      const renderBoardImageResults = () => {
+        clear(results);
+        const trimmed = boardImageQuery.trim();
+        if (!trimmed) {
+          results.appendChild(
+            el("p", { class: "library-hint" }, [
+              `${boardLibrary.length.toLocaleString()} pedalboard cases available — start typing to search.`,
+            ])
+          );
+          return;
+        }
+        const matches = searchPedalboards(boardLibrary, trimmed);
+        if (!matches.length) {
+          results.appendChild(el("p", { class: "library-hint" }, ["No matches."]));
+          return;
+        }
+        for (const product of matches) results.appendChild(renderBoardImageCard(product));
+      };
+      renderBoardImageResults();
+    }
+
     wrap.appendChild(
       el("p", { class: "library-hint" }, [
         `${board.pedals.length} pedal${board.pedals.length === 1 ? "" : "s"} · ${board.connections.length} connection${board.connections.length === 1 ? "" : "s"}`,
       ])
     );
     return wrap;
+  }
+
+  function renderBoardImageCard(product: LibraryPedal) {
+    const useBtn = el("button", { class: "library-card-add", title: "Use as this board's image" }, ["+"]);
+    useBtn.addEventListener("click", () => {
+      store.updateBoardMeta({ image: product.image, widthIn: product.widthIn, heightIn: product.heightIn });
+    });
+    return el("div", { class: "library-card" }, [
+      el("img", {
+        src: pedalboardImageUrl(product.image),
+        alt: `${product.brand} ${product.name}`,
+        loading: "lazy",
+        draggable: false,
+      }),
+      el("div", { class: "library-card-info" }, [
+        el("span", { class: "library-card-brand" }, [product.brand]),
+        el("span", { class: "library-card-name" }, [product.name]),
+        el("span", { class: "library-card-dims" }, [`${product.widthIn}" × ${product.heightIn}"`]),
+      ]),
+      useBtn,
+    ]);
   }
 
   render();
