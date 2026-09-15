@@ -2,6 +2,7 @@ import "./style.css";
 import { el } from "./dom";
 import { store } from "./store";
 import { loadPedalLibrary } from "./pedalData";
+import { loadPedalboardLibrary } from "./pedalboardData";
 import { createBoardView } from "./ui/board";
 import { createLibraryPanel } from "./ui/library";
 import { createInspector } from "./ui/inspector";
@@ -33,10 +34,11 @@ async function main() {
 
   const library = await loadPedalLibrary();
   const libraryMap = new Map(library.map((p) => [p.id, p]));
+  const boardLibrary = await loadPedalboardLibrary();
 
   const toolbar = createToolbar(toolbarRoot);
   const board = createBoardView(boardRoot, { library: libraryMap });
-  const inspector = createInspector(inspectorRoot, libraryMap);
+  const inspector = createInspector(inspectorRoot, libraryMap, boardLibrary);
   await createLibraryPanel(libraryRoot);
 
   function renderAll() {

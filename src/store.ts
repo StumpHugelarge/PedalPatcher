@@ -190,7 +190,7 @@ class Store {
     this.emit();
   }
 
-  updateBoardMeta(patch: Partial<Pick<Board, "name" | "widthIn" | "heightIn" | "color">>) {
+  updateBoardMeta(patch: Partial<Pick<Board, "name" | "widthIn" | "heightIn" | "color" | "image">>) {
     Object.assign(this.getActiveBoard(), patch);
     this.emit();
   }

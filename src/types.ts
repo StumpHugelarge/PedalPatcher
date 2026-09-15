@@ -73,6 +73,7 @@ export interface Board {
   widthIn: number;
   heightIn: number;
   color: string;
+  image?: string | null; // filename of a chosen pedalboard-case product, resolved via pedalboardImageUrl()
   pedals: PlacedPedal[];
   connections: Connection[];
 }
