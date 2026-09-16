@@ -33,11 +33,17 @@ export interface PlacedPedal {
   // Pedal Playground dataset.
   stereoIO?: boolean; // adds a 2nd input + 2nd output
   midi?: boolean; // adds a MIDI in + MIDI out
+  sendReturn?: boolean; // adds a send + return (effects loop)
+  directOut?: boolean; // adds a direct/thru output
+  expIn?: boolean; // adds an expression pedal input
 }
 
-// Every pedal always has in1/out1. stereoIO adds in2/out2; midi adds
-// midiIn/midiOut. See geometry.ts for where these land on the pedal body.
-export type JackId = "in1" | "in2" | "out1" | "out2" | "midiIn" | "midiOut";
+// Every pedal always has in1/out1. stereoIO adds in2/out2 on the left/right
+// edges next to them. All other extras — MIDI, send/return, direct out,
+// expression in — share the top edge, evenly spaced across however many of
+// them are active on a given pedal, matching where these jacks usually
+// actually sit on real pedals. See geometry.ts for the exact layout.
+export type JackId = "in1" | "in2" | "out1" | "out2" | "midiIn" | "midiOut" | "send" | "return" | "directOut" | "expIn";
 
 export const JACK_ROLE: Record<JackId, "in" | "out"> = {
   in1: "in",
@@ -46,15 +52,26 @@ export const JACK_ROLE: Record<JackId, "in" | "out"> = {
   out2: "out",
   midiIn: "in",
   midiOut: "out",
+  send: "out",
+  return: "in",
+  directOut: "out",
+  expIn: "in",
 };
 
-export const JACK_FAMILY: Record<JackId, "audio" | "midi"> = {
+// Purely a visual/organizational grouping (jack dot color, etc.) — connections
+// are no longer restricted by family, since plenty of real pedals patch
+// non-standard combinations.
+export const JACK_FAMILY: Record<JackId, "audio" | "midi" | "control"> = {
   in1: "audio",
   in2: "audio",
   out1: "audio",
   out2: "audio",
   midiIn: "midi",
   midiOut: "midi",
+  send: "audio",
+  return: "audio",
+  directOut: "audio",
+  expIn: "control",
 };
 
 export const JACK_LABEL: Record<JackId, string> = {
@@ -64,6 +81,10 @@ export const JACK_LABEL: Record<JackId, string> = {
   out2: "Output 2 (stereo)",
   midiIn: "MIDI In",
   midiOut: "MIDI Out",
+  send: "Send",
+  return: "Return",
+  directOut: "Direct Out",
+  expIn: "Expression In",
 };
 
 export type ConnectionMode = "snapped" | "freeform";

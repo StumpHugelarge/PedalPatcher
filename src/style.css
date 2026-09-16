@@ -74,6 +74,13 @@ a { color: var(--accent-2); }
   gap: 10px;
 }
 .app-title-mark { font-size: 1.2rem; }
+.app-version {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--ink-faint);
+  font-weight: 500;
+  margin-left: 2px;
+}
 
 /* ---- toolbar ---- */
 
@@ -275,7 +282,11 @@ a { color: var(--accent-2); }
 
 /* ---- library panel ---- */
 
-.library-search { margin-bottom: 10px; }
+.library-search {
+  margin-bottom: 10px;
+  color: var(--ink);
+}
+.library-search::placeholder { color: var(--ink-faint); }
 .library-hint { font-size: 0.82rem; color: var(--ink-faint); }
 
 .library-results {
@@ -420,6 +431,7 @@ a { color: var(--accent-2); }
 }
 .jack-out { border-color: var(--accent); }
 .jack-family-midi { border-color: #8b6fb3; }
+.jack-family-control { border-color: var(--good); }
 .jack:hover { transform: translate(-50%, -50%) scale(1.3); }
 
 .connection-layer { position: absolute; top: 0; left: 0; pointer-events: none; }

@@ -27,6 +27,21 @@ export function cableStyle(type: CableType) {
   return CABLE_STYLE[type];
 }
 
+// Snapped connections lead a short distance straight out from the pedal
+// edge before bending, so the cable clears the pedal's outline (and its
+// dashed collision/selection ring) instead of running flush along it.
+const CABLE_LEAD_IN = 0.18; // inches
+
+function leadPoint(
+  fp: Footprint | undefined,
+  jack: JackId,
+  pos: { xIn: number; yIn: number }
+): { xIn: number; yIn: number } {
+  const dir = fp?.jackDirs[jack];
+  if (!dir) return pos;
+  return { xIn: pos.xIn + dir.dxIn * CABLE_LEAD_IN, yIn: pos.yIn + dir.dyIn * CABLE_LEAD_IN };
+}
+
 /** Two-bend ("Z") route for a snapped connection: from -> corner -> corner
  * -> to, through a single drag handle that can move in both directions.
  * `bend` is a signed inch offset from the natural (midpoint) via-point —
@@ -190,9 +205,11 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       const p1 = fromFp?.jacks[conn.from!.jack];
       const p2 = toFp?.jacks[conn.to!.jack];
       if (!p1 || !p2) return;
-      entry.el.setAttribute("points", pointsAttr(elbowPath(p1, p2, conn.bend), scale));
+      const p1L = leadPoint(fromFp, conn.from!.jack, p1);
+      const p2L = leadPoint(toFp, conn.to!.jack, p2);
+      entry.el.setAttribute("points", pointsAttr([p1, ...elbowPath(p1L, p2L, conn.bend), p2], scale));
       if (entry.handleEl) {
-        const hp = elbowHandlePos(p1, p2, conn.bend);
+        const hp = elbowHandlePos(p1L, p2L, conn.bend);
         entry.handleEl.style.left = `${hp.xIn * scale}px`;
         entry.handleEl.style.top = `${hp.yIn * scale}px`;
       }
@@ -205,6 +222,9 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       const fp = getFootprint(xIn, yIn, baseW, baseH, pedal.rotation, {
         stereoIO: pedal.stereoIO,
         midi: pedal.midi,
+        sendReturn: pedal.sendReturn,
+        directOut: pedal.directOut,
+        expIn: pedal.expIn,
       });
       footprintByPedalId.set(pedal.id, fp);
       livePos.set(pedal.id, { xIn, yIn });
@@ -260,9 +280,11 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
         const p1 = fromFp?.jacks[conn.from!.jack];
         const p2 = toFp?.jacks[conn.to!.jack];
         if (!p1 || !p2) return;
+        const p1L = leadPoint(fromFp, conn.from!.jack, p1);
+        const p2L = leadPoint(toFp, conn.to!.jack, p2);
         liveBend = {
-          dx: xIn - (p1.xIn + p2.xIn) / 2,
-          dy: yIn - (p1.yIn + p2.yIn) / 2,
+          dx: xIn - (p1L.xIn + p2L.xIn) / 2,
+          dy: yIn - (p1L.yIn + p2L.yIn) / 2,
         };
         if (!rafPending) {
           rafPending = true;
@@ -315,10 +337,12 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
         const p1 = fromFp?.jacks[conn.from.jack];
         const p2 = toFp?.jacks[conn.to.jack];
         if (!p1 || !p2) continue;
+        const p1L = leadPoint(fromFp, conn.from.jack, p1);
+        const p2L = leadPoint(toFp, conn.to.jack, p2);
         const style = cableStyle(conn.cableType);
         const line = svgEl("polyline", {
           class: `connection${selected ? " is-selected" : ""}`,
-          points: pointsAttr(elbowPath(p1, p2, conn.bend), scale),
+          points: pointsAttr([p1, ...elbowPath(p1L, p2L, conn.bend), p2], scale),
           fill: "none",
           stroke: style.color,
           "stroke-dasharray": style.dash,
@@ -329,7 +353,7 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
         });
         svg.appendChild(line);
 
-        const handleEl = selected ? renderConnectionHandle(conn, elbowHandlePos(p1, p2, conn.bend)) : null;
+        const handleEl = selected ? renderConnectionHandle(conn, elbowHandlePos(p1L, p2L, conn.bend)) : null;
         liveConnections.push({ conn, el: line, handleEl });
       } else if (conn.mode === "freeform" && conn.points) {
         const style = cableStyle(conn.cableType);

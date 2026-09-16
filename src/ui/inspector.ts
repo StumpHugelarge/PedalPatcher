@@ -59,10 +59,25 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
       stereoCheck.addEventListener("change", () => store.setPedalOptions(pedal.id, { stereoIO: stereoCheck.checked }));
       const midiCheck = el("input", { type: "checkbox", checked: !!pedal.midi }) as HTMLInputElement;
       midiCheck.addEventListener("change", () => store.setPedalOptions(pedal.id, { midi: midiCheck.checked }));
+      const sendReturnCheck = el("input", { type: "checkbox", checked: !!pedal.sendReturn }) as HTMLInputElement;
+      sendReturnCheck.addEventListener("change", () =>
+        store.setPedalOptions(pedal.id, { sendReturn: sendReturnCheck.checked })
+      );
+      const directOutCheck = el("input", { type: "checkbox", checked: !!pedal.directOut }) as HTMLInputElement;
+      directOutCheck.addEventListener("change", () =>
+        store.setPedalOptions(pedal.id, { directOut: directOutCheck.checked })
+      );
+      const expInCheck = el("input", { type: "checkbox", checked: !!pedal.expIn }) as HTMLInputElement;
+      expInCheck.addEventListener("change", () => store.setPedalOptions(pedal.id, { expIn: expInCheck.checked }));
       panel.appendChild(
         el("label", { class: "checkbox-field" }, [stereoCheck, " Stereo I/O (adds a 2nd input + output)"])
       );
       panel.appendChild(el("label", { class: "checkbox-field" }, [midiCheck, " MIDI (adds MIDI in + out)"]));
+      panel.appendChild(
+        el("label", { class: "checkbox-field" }, [sendReturnCheck, " Send/return (effects loop)"])
+      );
+      panel.appendChild(el("label", { class: "checkbox-field" }, [directOutCheck, " Direct out"]));
+      panel.appendChild(el("label", { class: "checkbox-field" }, [expInCheck, " Expression pedal in"]));
 
       if (isCustom) {
         panel.appendChild(el("p", { class: "library-hint" }, ["Custom pedal — not part of the imported library."]));

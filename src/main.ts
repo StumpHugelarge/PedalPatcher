@@ -8,6 +8,10 @@ import { createLibraryPanel } from "./ui/library";
 import { createInspector } from "./ui/inspector";
 import { createToolbar } from "./ui/toolbar";
 
+// Bumped by hand for each meaningful release — shown next to the title so
+// it's easy to tell at a glance which build is live.
+const APP_VERSION = "v3";
+
 async function main() {
   const app = document.getElementById("app")!;
 
@@ -16,6 +20,7 @@ async function main() {
       el("div", { class: "app-title" }, [
         el("span", { class: "app-title-mark" }, ["🎛️"]),
         el("span", {}, ["Board & Chain"]),
+        el("span", { class: "app-version" }, [APP_VERSION]),
       ]),
     ]),
     el("div", { class: "toolbar-row" }),

@@ -1,6 +1,5 @@
 import { makeId } from "./id";
 import { getFootprint, clamp } from "./geometry";
-import { JACK_FAMILY, JACK_ROLE } from "./types";
 import type {
   Board,
   CableType,
@@ -262,7 +261,7 @@ class Store {
     this.emit();
   }
 
-  setPedalOptions(id: string, patch: Partial<Pick<PlacedPedal, "stereoIO" | "midi">>) {
+  setPedalOptions(id: string, patch: Partial<Pick<PlacedPedal, "stereoIO" | "midi" | "sendReturn" | "directOut" | "expIn">>) {
     const p = this.getActiveBoard().pedals.find((p) => p.id === id);
     if (!p) return;
     Object.assign(p, patch);
@@ -331,14 +330,11 @@ class Store {
       this.cancelPending();
       return;
     }
-    // An input can only connect to an output (never two of the same role),
-    // and audio jacks can't cross-connect to MIDI jacks. Treat a mismatched
-    // attempt the same as clicking the same pedal — cancel rather than
-    // silently doing nothing, so the user isn't left with a stuck pending line.
-    if (JACK_ROLE[pending.from.jack] === JACK_ROLE[jack] || JACK_FAMILY[pending.from.jack] !== JACK_FAMILY[jack]) {
-      this.cancelPending();
-      return;
-    }
+    // Patching is intentionally unrestricted — plenty of real pedals have
+    // non-standard jacks (expression inputs feeding a MIDI converter, send
+    // used as a second output, etc.), so any jack can connect to any other.
+    // The only remaining rule is: a jack can't connect to another jack on
+    // the same pedal.
     const conn: Connection = {
       id: makeId("conn"),
       mode: "snapped",
@@ -548,5 +544,8 @@ export function pedalFootprint(pedal: PlacedPedal, library: Map<string, LibraryP
   return getFootprint(pedal.xIn, pedal.yIn, w, h, pedal.rotation, {
     stereoIO: pedal.stereoIO,
     midi: pedal.midi,
+    sendReturn: pedal.sendReturn,
+    directOut: pedal.directOut,
+    expIn: pedal.expIn,
   });
 }
