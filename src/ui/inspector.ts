@@ -79,6 +79,19 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
       panel.appendChild(el("label", { class: "checkbox-field" }, [directOutCheck, " Direct out"]));
       panel.appendChild(el("label", { class: "checkbox-field" }, [expInCheck, " Expression pedal in"]));
 
+      panel.appendChild(el("label", { class: "field-label" }, ["Notes"]));
+      const notesArea = el(
+        "textarea",
+        {
+          class: "field notes-field",
+          rows: "3",
+          placeholder: "Settings, model, reminders…",
+        },
+        [pedal.notes ?? ""]
+      ) as HTMLTextAreaElement;
+      notesArea.addEventListener("change", () => store.setPedalNotes(pedal.id, notesArea.value));
+      panel.appendChild(notesArea);
+
       if (isCustom) {
         panel.appendChild(el("p", { class: "library-hint" }, ["Custom pedal — not part of the imported library."]));
       }

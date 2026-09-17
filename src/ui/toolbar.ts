@@ -58,6 +58,18 @@ export function createToolbar(root: HTMLElement) {
     bar.appendChild(cableSelect);
 
     // ---- file actions ----
+    // ---- undo/redo ----
+    const historyGroup = el("div", { class: "toolbar-group" });
+    const undoBtn = el("button", { class: "icon-btn", title: "Undo (Ctrl/Cmd+Z)" }, ["↶"]) as HTMLButtonElement;
+    undoBtn.disabled = !store.canUndo;
+    undoBtn.addEventListener("click", () => store.undo());
+    const redoBtn = el("button", { class: "icon-btn", title: "Redo (Ctrl/Cmd+Shift+Z)" }, ["↷"]) as HTMLButtonElement;
+    redoBtn.disabled = !store.canRedo;
+    redoBtn.addEventListener("click", () => store.redo());
+    historyGroup.appendChild(undoBtn);
+    historyGroup.appendChild(redoBtn);
+    bar.appendChild(historyGroup);
+
     const fileGroup = el("div", { class: "toolbar-group toolbar-file" });
     const fileLabel = el("span", { class: "file-name" }, [currentFileName() ?? "unsaved project"]);
 

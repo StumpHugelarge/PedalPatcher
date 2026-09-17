@@ -79,6 +79,16 @@ async function main() {
         e.preventDefault();
         store.pasteClipboard();
       }
+    } else if (mod && !e.shiftKey && e.key.toLowerCase() === "z") {
+      if (store.canUndo) {
+        e.preventDefault();
+        store.undo();
+      }
+    } else if ((mod && e.shiftKey && e.key.toLowerCase() === "z") || (mod && e.key.toLowerCase() === "y")) {
+      if (store.canRedo) {
+        e.preventDefault();
+        store.redo();
+      }
     }
   });
 

@@ -523,6 +523,10 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       [inner]
     );
 
+    if (pedal.notes) {
+      outer.appendChild(el("div", { class: "pedal-notes-dot", title: "Has notes" }));
+    }
+
     let dragStart: { x: number; y: number; origXIn: number; origYIn: number } | null = null;
     let liveXIn = pedal.xIn;
     let liveYIn = pedal.yIn;
