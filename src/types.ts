@@ -36,6 +36,7 @@ export interface PlacedPedal {
   sendReturn?: boolean; // adds a send + return (effects loop)
   directOut?: boolean; // adds a direct/thru output
   expIn?: boolean; // adds an expression pedal input
+  notes?: string; // free-text personal notes (settings, model, reminders), not from the library data
 }
 
 // Every pedal always has in1/out1. stereoIO adds in2/out2 on the left/right

@@ -110,6 +110,8 @@ a { color: var(--accent-2); }
 .board-tab-add { font-weight: 700; padding: 6px 10px; }
 
 .toolbar-group { display: flex; gap: 4px; }
+.toolbar-snap { align-items: center; gap: 10px; }
+.toolbar-snap .checkbox-field { margin-bottom: 0; white-space: nowrap; }
 
 .mode-btn {
   font-family: "JetBrains Mono", monospace;
@@ -234,6 +236,7 @@ a { color: var(--accent-2); }
   margin-bottom: 4px;
 }
 .field-error { color: var(--bad); font-size: 0.8rem; margin: 0 0 8px; }
+.notes-field { font-family: inherit; font-size: 0.85rem; resize: vertical; }
 
 .checkbox-field {
   display: flex;
@@ -260,6 +263,20 @@ a { color: var(--accent-2); }
 .danger-btn { color: var(--bad); border-color: var(--bad); background: transparent; margin-top: 10px; }
 .secondary-btn { background: var(--paper); }
 .secondary-btn:hover, .primary-btn:hover { filter: brightness(1.05); }
+
+.icon-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+.icon-btn:hover:not(:disabled) { filter: brightness(1.05); }
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
 
 /* ---- credit button ---- */
 
@@ -434,6 +451,19 @@ a { color: var(--accent-2); }
 .jack-family-control { border-color: var(--good); }
 .jack:hover { transform: translate(-50%, -50%) scale(1.3); }
 
+.pedal-notes-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  border: 1.5px solid var(--panel);
+  pointer-events: none;
+  z-index: 4;
+}
+
 .connection-layer { position: absolute; top: 0; left: 0; pointer-events: none; }
 .connection-layer .connection { pointer-events: stroke; cursor: pointer; stroke-width: 2.5; }
 .connection-layer .connection.is-selected { stroke-width: 4; }
@@ -469,3 +499,33 @@ a { color: var(--accent-2); }
   .app-body { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
   .library-column, .inspector-column { max-height: 260px; }
 }
+
+/* ---- print (used by the "Print / Save as PDF" toolbar action) ---- */
+
+@media print {
+  .app-header, .toolbar-row, .library-column, .inspector-column, .zoom-bar { display: none !important; }
+  .app-body { grid-template-columns: 1fr !important; }
+  .board-column { overflow: visible !important; padding: 0 !important; display: block !important; }
+  .board-scroll { margin: 0 !important; }
+}
+
+/* ---- read-only share view ---- */
+
+.share-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  min-height: 100%;
+}
+.share-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: "Archivo", sans-serif;
+  font-size: 0.9rem;
+}
+.share-canvas-wrap { max-width: 100%; overflow: auto; }
+.share-canvas-wrap img { max-width: 100%; display: block; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 10px 30px rgba(0, 0, 0, 0.12); border-radius: 6px; }
+.share-error { padding: 40px; text-align: center; font-family: "Archivo", sans-serif; color: var(--ink-soft); }
