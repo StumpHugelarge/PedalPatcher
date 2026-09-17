@@ -1,5 +1,6 @@
 import { makeId } from "./id";
 import { getFootprint, clamp } from "./geometry";
+import { leadPoint, elbowPath, pathLengthIn } from "./cableMath";
 import type {
   Board,
   CableType,
@@ -97,6 +98,55 @@ class Store {
   private listeners = new Set<() => void>();
   private saveTimer: number | undefined;
 
+  // ---- undo/redo ----
+  // Snapshot-based rather than command-based: given how much of the store
+  // already mutates `state.project` in place, recording "the whole project,
+  // before this change" is far simpler and less error-prone than making
+  // every mutation independently reversible. Every store method that
+  // commits a project-data change (not selection/pending/UI-mode state)
+  // calls snapshotForUndo() as its first line. Because drag gestures and
+  // similar continuous interactions already only call their store method
+  // once, on release — see movePedal/setConnectionBend call sites — this
+  // naturally coalesces into one undo step per user action with no extra
+  // debouncing needed here.
+  private undoStack: string[] = [];
+  private redoStack: string[] = [];
+  private readonly UNDO_CAP = 50;
+
+  private snapshotForUndo() {
+    this.undoStack.push(JSON.stringify(this.state.project));
+    if (this.undoStack.length > this.UNDO_CAP) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
+  get canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  get canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  undo() {
+    const prev = this.undoStack.pop();
+    if (prev === undefined) return;
+    this.redoStack.push(JSON.stringify(this.state.project));
+    this.state.project = JSON.parse(prev);
+    this.state.selection = null;
+    this.state.pending = null;
+    this.emit();
+  }
+
+  redo() {
+    const next = this.redoStack.pop();
+    if (next === undefined) return;
+    this.undoStack.push(JSON.stringify(this.state.project));
+    this.state.project = JSON.parse(next);
+    this.state.selection = null;
+    this.state.pending = null;
+    this.emit();
+  }
+
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -151,6 +201,8 @@ class Store {
     this.state.project = migrateProject(project);
     this.state.selection = null;
     this.state.pending = null;
+    this.undoStack = [];
+    this.redoStack = [];
     this.emit();
   }
 
@@ -161,6 +213,7 @@ class Store {
   // ---- boards ----
 
   addBoard(name: string) {
+    this.snapshotForUndo();
     const board = defaultBoard(name);
     this.state.project.boards.push(board);
     this.state.project.activeBoardId = board.id;
@@ -169,6 +222,7 @@ class Store {
   }
 
   duplicateActiveBoard() {
+    this.snapshotForUndo();
     const src = this.getActiveBoard();
     const copy: Board = JSON.parse(JSON.stringify(src));
     copy.id = makeId("board");
@@ -195,6 +249,7 @@ class Store {
     if (boards.length <= 1) return; // always keep at least one board
     const idx = boards.findIndex((b) => b.id === id);
     if (idx === -1) return;
+    this.snapshotForUndo();
     boards.splice(idx, 1);
     if (this.state.project.activeBoardId === id) {
       this.state.project.activeBoardId = boards[Math.max(0, idx - 1)].id;
@@ -211,6 +266,7 @@ class Store {
   }
 
   updateBoardMeta(patch: Partial<Pick<Board, "name" | "widthIn" | "heightIn" | "color" | "image">>) {
+    this.snapshotForUndo();
     Object.assign(this.getActiveBoard(), patch);
     this.emit();
   }
@@ -218,6 +274,7 @@ class Store {
   // ---- pedals ----
 
   addPedalFromLibrary(lib: LibraryPedal, xIn: number, yIn: number) {
+    this.snapshotForUndo();
     const board = this.getActiveBoard();
     const pedal: PlacedPedal = {
       id: makeId("pedal"),
@@ -232,6 +289,7 @@ class Store {
   }
 
   addCustomPedal(data: CustomPedalData, xIn: number, yIn: number) {
+    this.snapshotForUndo();
     const board = this.getActiveBoard();
     const pedal: PlacedPedal = {
       id: makeId("pedal"),
@@ -249,6 +307,7 @@ class Store {
   movePedal(id: string, xIn: number, yIn: number) {
     const p = this.getActiveBoard().pedals.find((p) => p.id === id);
     if (!p) return;
+    this.snapshotForUndo();
     p.xIn = xIn;
     p.yIn = yIn;
     this.emit();
@@ -257,6 +316,7 @@ class Store {
   rotatePedal(id: string, rotation: Rotation) {
     const p = this.getActiveBoard().pedals.find((p) => p.id === id);
     if (!p) return;
+    this.snapshotForUndo();
     p.rotation = rotation;
     this.emit();
   }
@@ -264,12 +324,23 @@ class Store {
   setPedalOptions(id: string, patch: Partial<Pick<PlacedPedal, "stereoIO" | "midi" | "sendReturn" | "directOut" | "expIn">>) {
     const p = this.getActiveBoard().pedals.find((p) => p.id === id);
     if (!p) return;
+    this.snapshotForUndo();
     Object.assign(p, patch);
+    this.emit();
+  }
+
+  setPedalNotes(id: string, notes: string) {
+    const p = this.getActiveBoard().pedals.find((p) => p.id === id);
+    if (!p) return;
+    this.snapshotForUndo();
+    p.notes = notes.trim() ? notes : undefined;
     this.emit();
   }
 
   removePedal(id: string) {
     const board = this.getActiveBoard();
+    if (!board.pedals.some((p) => p.id === id)) return;
+    this.snapshotForUndo();
     board.pedals = board.pedals.filter((p) => p.id !== id);
     board.connections = board.connections.filter(
       (c) => c.from?.pedalId !== id && c.to?.pedalId !== id
@@ -335,6 +406,7 @@ class Store {
     // used as a second output, etc.), so any jack can connect to any other.
     // The only remaining rule is: a jack can't connect to another jack on
     // the same pedal.
+    this.snapshotForUndo();
     const conn: Connection = {
       id: makeId("conn"),
       mode: "snapped",
@@ -356,6 +428,7 @@ class Store {
       this.cancelPending();
       return;
     }
+    this.snapshotForUndo();
     const conn: Connection = {
       id: makeId("conn"),
       mode: "freeform",
@@ -370,6 +443,8 @@ class Store {
 
   removeConnection(id: string) {
     const board = this.getActiveBoard();
+    if (!board.connections.some((c) => c.id === id)) return;
+    this.snapshotForUndo();
     board.connections = board.connections.filter((c) => c.id !== id);
     if (this.state.selection?.type === "connection" && this.state.selection.id === id) {
       this.state.selection = null;
@@ -380,6 +455,7 @@ class Store {
   setConnectionCableType(id: string, cableType: CableType) {
     const c = this.getActiveBoard().connections.find((c) => c.id === id);
     if (!c) return;
+    this.snapshotForUndo();
     c.cableType = cableType;
     this.emit();
   }
@@ -387,6 +463,7 @@ class Store {
   setConnectionBend(id: string, bend: { dx: number; dy: number }) {
     const c = this.getActiveBoard().connections.find((c) => c.id === id);
     if (!c) return;
+    this.snapshotForUndo();
     c.bend = bend;
     this.emit();
   }
@@ -440,6 +517,7 @@ class Store {
     } else if (sel.type === "pedals") {
       const board = this.getActiveBoard();
       const idSet = new Set(sel.ids);
+      this.snapshotForUndo();
       board.pedals = board.pedals.filter((p) => !idSet.has(p.id));
       board.connections = board.connections.filter(
         (c) => !(c.from && idSet.has(c.from.pedalId)) && !(c.to && idSet.has(c.to.pedalId))
@@ -485,6 +563,7 @@ class Store {
    * pedals across boards without a simultaneous multi-board view. */
   pasteClipboard() {
     if (!this.clipboardData || !this.clipboardData.pedals.length) return;
+    this.snapshotForUndo();
     const board = this.getActiveBoard();
     this.pasteCount += 1;
     const offset = 0.6 * this.pasteCount; // inches; cascades further on repeated pastes
@@ -548,4 +627,30 @@ export function pedalFootprint(pedal: PlacedPedal, library: Map<string, LibraryP
     directOut: pedal.directOut,
     expIn: pedal.expIn,
   });
+}
+
+/** The actual routed length of a connection, in inches — the same path
+ * board.ts draws (lead-stub + elbow bends for a snapped connection, or the
+ * raw drawn points for a freeform one), summed as straight segments. */
+export function connectionLengthIn(
+  conn: Connection,
+  board: Board,
+  library: Map<string, LibraryPedal>
+): number | null {
+  if (conn.mode === "freeform") {
+    const points = conn.points;
+    return points && points.length >= 2 ? pathLengthIn(points) : null;
+  }
+  if (!conn.from || !conn.to) return null;
+  const fromPedal = board.pedals.find((p) => p.id === conn.from!.pedalId);
+  const toPedal = board.pedals.find((p) => p.id === conn.to!.pedalId);
+  if (!fromPedal || !toPedal) return null;
+  const fromFp = pedalFootprint(fromPedal, library);
+  const toFp = pedalFootprint(toPedal, library);
+  const p1 = fromFp.jacks[conn.from.jack];
+  const p2 = toFp.jacks[conn.to.jack];
+  if (!p1 || !p2) return null;
+  const p1L = leadPoint(fromFp, conn.from.jack, p1);
+  const p2L = leadPoint(toFp, conn.to.jack, p2);
+  return pathLengthIn([p1, ...elbowPath(p1L, p2L, conn.bend), p2]);
 }

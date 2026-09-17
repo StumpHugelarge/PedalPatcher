@@ -10,7 +10,7 @@ import { createToolbar } from "./ui/toolbar";
 
 // Bumped by hand for each meaningful release — shown next to the title so
 // it's easy to tell at a glance which build is live.
-const APP_VERSION = "v3";
+const APP_VERSION = "v4.1";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -78,6 +78,16 @@ async function main() {
       if (store.clipboardCount > 0) {
         e.preventDefault();
         store.pasteClipboard();
+      }
+    } else if (mod && !e.shiftKey && e.key.toLowerCase() === "z") {
+      if (store.canUndo) {
+        e.preventDefault();
+        store.undo();
+      }
+    } else if ((mod && e.shiftKey && e.key.toLowerCase() === "z") || (mod && e.key.toLowerCase() === "y")) {
+      if (store.canRedo) {
+        e.preventDefault();
+        store.redo();
       }
     }
   });

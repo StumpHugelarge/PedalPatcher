@@ -1,10 +1,12 @@
 import { el, clear } from "../dom";
 import { store } from "../store";
+import { connectionLengthIn } from "../store";
 import { nextRotation } from "../geometry";
 import { cableStyle } from "./board";
 import type { CableType, LibraryPedal } from "../types";
 import { pedalboardImageUrl } from "../pedalboardData";
 import type { PedalboardPreset } from "../pedalboardData";
+import { CABLE_SLACK_IN, cableSizeLabel, roundUpToStandardCable, buildShoppingList } from "../cableMath";
 
 const CABLE_TYPES: CableType[] = ["instrument", "patch", "send-return", "midi", "power"];
 
@@ -79,6 +81,19 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
       panel.appendChild(el("label", { class: "checkbox-field" }, [directOutCheck, " Direct out"]));
       panel.appendChild(el("label", { class: "checkbox-field" }, [expInCheck, " Expression pedal in"]));
 
+      panel.appendChild(el("label", { class: "field-label" }, ["Notes"]));
+      const notesArea = el(
+        "textarea",
+        {
+          class: "field notes-field",
+          rows: "3",
+          placeholder: "Settings, model, reminders…",
+        },
+        [pedal.notes ?? ""]
+      ) as HTMLTextAreaElement;
+      notesArea.addEventListener("change", () => store.setPedalNotes(pedal.id, notesArea.value));
+      panel.appendChild(notesArea);
+
       if (isCustom) {
         panel.appendChild(el("p", { class: "library-hint" }, ["Custom pedal — not part of the imported library."]));
       }
@@ -133,6 +148,19 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
           el("span", {}, [conn.mode === "snapped" ? "Snap-to-jack (follows pedals)" : "Freeform"]),
         ])
       );
+
+      const lengthIn = connectionLengthIn(conn, board, library);
+      if (lengthIn !== null) {
+        const needed = lengthIn + CABLE_SLACK_IN;
+        panel.appendChild(
+          el("div", { class: "inspector-field" }, [
+            el("span", { class: "field-label" }, ["Cable length"]),
+            el("span", { class: "mono-value" }, [
+              `~${lengthIn.toFixed(1)}" routed → buy a ${cableSizeLabel(roundUpToStandardCable(needed))} cable`,
+            ]),
+          ])
+        );
+      }
 
       const select = el(
         "select",
@@ -246,6 +274,20 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
         `${board.pedals.length} pedal${board.pedals.length === 1 ? "" : "s"} · ${board.connections.length} connection${board.connections.length === 1 ? "" : "s"}`,
       ])
     );
+
+    const lengths = board.connections
+      .map((c) => connectionLengthIn(c, board, library))
+      .filter((n): n is number => n !== null);
+    if (lengths.length) {
+      const totalRawIn = lengths.reduce((a, b) => a + b, 0);
+      const shoppingList = buildShoppingList(lengths.map((l) => l + CABLE_SLACK_IN));
+      wrap.appendChild(el("label", { class: "field-label" }, ["Cable needed"]));
+      wrap.appendChild(
+        el("p", { class: "library-hint" }, [
+          `~${totalRawIn.toFixed(0)}" routed total. Buy: ${shoppingList.map((s) => `${s.count}× ${s.label}`).join(", ")}.`,
+        ])
+      );
+    }
     return wrap;
   }
 
