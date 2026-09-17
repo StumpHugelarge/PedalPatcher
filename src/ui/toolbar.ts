@@ -2,11 +2,14 @@ import { el, clear } from "../dom";
 import { store } from "../store";
 import { cableStyle } from "./board";
 import { saveProject, openProject, currentFileName } from "../fileIO";
-import type { CableType, ConnectionMode } from "../types";
+import { getPrefs, setPrefs } from "../prefs";
+import { downloadBoardPng } from "../export";
+import { buildShareUrl, SHARE_LINK_WARN_LENGTH } from "../shareLink";
+import type { CableType, ConnectionMode, LibraryPedal } from "../types";
 
 const CABLE_TYPES: CableType[] = ["instrument", "patch", "send-return", "midi", "power"];
 
-export function createToolbar(root: HTMLElement) {
+export function createToolbar(root: HTMLElement, library: Map<string, LibraryPedal>) {
   const bar = el("div", { class: "toolbar" });
   root.appendChild(bar);
 
@@ -46,6 +49,22 @@ export function createToolbar(root: HTMLElement) {
     });
     bar.appendChild(drawGroup);
 
+    // ---- position snapping (personal device setting, not project data) ----
+    const snapGroup = el("div", { class: "toolbar-group toolbar-snap" });
+    const prefs = getPrefs();
+    const gridCheck = el("input", { type: "checkbox", checked: prefs.snapGrid }) as HTMLInputElement;
+    gridCheck.addEventListener("change", () => setPrefs({ snapGrid: gridCheck.checked }));
+    const neighborCheck = el("input", { type: "checkbox", checked: prefs.snapNeighbor }) as HTMLInputElement;
+    neighborCheck.addEventListener("change", () => setPrefs({ snapNeighbor: neighborCheck.checked }));
+    snapGroup.appendChild(el("label", { class: "checkbox-field", title: "Snap dragged pedals to a 0.5\" grid" }, [gridCheck, " Snap: grid"]));
+    snapGroup.appendChild(
+      el("label", { class: "checkbox-field", title: "Snap dragged pedals to line up with nearby pedals" }, [
+        neighborCheck,
+        " Snap: neighbors",
+      ])
+    );
+    bar.appendChild(snapGroup);
+
     const cableSelect = el(
       "select",
       {
@@ -58,6 +77,18 @@ export function createToolbar(root: HTMLElement) {
     bar.appendChild(cableSelect);
 
     // ---- file actions ----
+    // ---- undo/redo ----
+    const historyGroup = el("div", { class: "toolbar-group" });
+    const undoBtn = el("button", { class: "icon-btn", title: "Undo (Ctrl/Cmd+Z)" }, ["↶"]) as HTMLButtonElement;
+    undoBtn.disabled = !store.canUndo;
+    undoBtn.addEventListener("click", () => store.undo());
+    const redoBtn = el("button", { class: "icon-btn", title: "Redo (Ctrl/Cmd+Shift+Z)" }, ["↷"]) as HTMLButtonElement;
+    redoBtn.disabled = !store.canRedo;
+    redoBtn.addEventListener("click", () => store.redo());
+    historyGroup.appendChild(undoBtn);
+    historyGroup.appendChild(redoBtn);
+    bar.appendChild(historyGroup);
+
     const fileGroup = el("div", { class: "toolbar-group toolbar-file" });
     const fileLabel = el("span", { class: "file-name" }, [currentFileName() ?? "unsaved project"]);
 
@@ -93,6 +124,52 @@ export function createToolbar(root: HTMLElement) {
     fileGroup.appendChild(saveAsBtn);
     fileGroup.appendChild(newProjectBtn);
     bar.appendChild(fileGroup);
+
+    // ---- export / share ----
+    const exportGroup = el("div", { class: "toolbar-group" });
+
+    const pngBtn = el("button", { class: "secondary-btn" }, ["Download PNG"]);
+    pngBtn.addEventListener("click", async () => {
+      const original = pngBtn.textContent;
+      pngBtn.textContent = "Rendering…";
+      (pngBtn as HTMLButtonElement).disabled = true;
+      try {
+        await downloadBoardPng(store.getActiveBoard(), library);
+      } catch {
+        alert("Couldn't render the image — try again.");
+      } finally {
+        pngBtn.textContent = original;
+        (pngBtn as HTMLButtonElement).disabled = false;
+      }
+    });
+
+    const printBtn = el("button", { class: "secondary-btn" }, ["Print / Save as PDF"]);
+    printBtn.addEventListener("click", () => window.print());
+
+    const shareBtn = el("button", { class: "secondary-btn" }, ["Share board (read-only)"]);
+    shareBtn.addEventListener("click", async () => {
+      const url = buildShareUrl(store.getActiveBoard());
+      const long = url.length > SHARE_LINK_WARN_LENGTH;
+      try {
+        if (long) throw new Error("long"); // skip straight to the visible prompt for long links
+        await navigator.clipboard.writeText(url);
+        const original = shareBtn.textContent;
+        shareBtn.textContent = "Link copied!";
+        setTimeout(() => (shareBtn.textContent = original), 1500);
+      } catch {
+        prompt(
+          long
+            ? "This board is large, so the link is long — copy it below:"
+            : "Copy this read-only link:",
+          url
+        );
+      }
+    });
+
+    exportGroup.appendChild(pngBtn);
+    exportGroup.appendChild(printBtn);
+    exportGroup.appendChild(shareBtn);
+    bar.appendChild(exportGroup);
   }
 
   render();

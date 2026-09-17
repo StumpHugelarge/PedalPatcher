@@ -7,6 +7,8 @@ import { pedalboardImageUrl } from "../pedalboardData";
 import { onDrop } from "../dragState";
 import { JACK_FAMILY, JACK_LABEL, JACK_ROLE } from "../types";
 import type { LibraryPedal, PlacedPedal, Connection, CableType, JackId } from "../types";
+import { leadPoint, elbowPath, elbowHandlePos } from "../cableMath";
+import { getPrefs } from "../prefs";
 
 const MIN_FIT_SCALE = 14;
 const MAX_FIT_SCALE = 72;
@@ -27,51 +29,14 @@ export function cableStyle(type: CableType) {
   return CABLE_STYLE[type];
 }
 
-// Snapped connections lead a short distance straight out from the pedal
-// edge before bending, so the cable clears the pedal's outline (and its
-// dashed collision/selection ring) instead of running flush along it.
-const CABLE_LEAD_IN = 0.18; // inches
-
-function leadPoint(
-  fp: Footprint | undefined,
-  jack: JackId,
-  pos: { xIn: number; yIn: number }
-): { xIn: number; yIn: number } {
-  const dir = fp?.jackDirs[jack];
-  if (!dir) return pos;
-  return { xIn: pos.xIn + dir.dxIn * CABLE_LEAD_IN, yIn: pos.yIn + dir.dyIn * CABLE_LEAD_IN };
-}
-
-/** Two-bend ("Z") route for a snapped connection: from -> corner -> corner
- * -> to, through a single drag handle that can move in both directions.
- * `bend` is a signed inch offset from the natural (midpoint) via-point —
- * {0,0}/undefined renders as a plain straight line whenever both jacks
- * share a height, since all points end up collinear. */
-function elbowPath(
-  from: { xIn: number; yIn: number },
-  to: { xIn: number; yIn: number },
-  bend: { dx: number; dy: number } | undefined
-): { xIn: number; yIn: number }[] {
-  const midX = (from.xIn + to.xIn) / 2 + (bend?.dx ?? 0);
-  const midY = (from.yIn + to.yIn) / 2 + (bend?.dy ?? 0);
-  return [
-    from,
-    { xIn: midX, yIn: from.yIn },
-    { xIn: midX, yIn: midY },
-    { xIn: to.xIn, yIn: midY },
-    to,
-  ];
-}
-
-function elbowHandlePos(
-  from: { xIn: number; yIn: number },
-  to: { xIn: number; yIn: number },
-  bend: { dx: number; dy: number } | undefined
-): { xIn: number; yIn: number } {
-  const midX = (from.xIn + to.xIn) / 2 + (bend?.dx ?? 0);
-  const midY = (from.yIn + to.yIn) / 2 + (bend?.dy ?? 0);
-  return { xIn: midX, yIn: midY };
-}
+// Personal-preference position snapping while dragging a pedal — grid and
+// neighbor-edge snapping are independent toggles (src/prefs.ts); a match
+// within this many *screen* pixels (converted to inches by the current
+// zoom) wins over the raw pointer position on a given axis, with neighbor
+// snapping checked first and grid snapping only filling in an axis
+// neighbor-snap didn't resolve.
+const SNAP_NEIGHBOR_PX = 6;
+const SNAP_GRID_IN = 0.5;
 
 function pointsAttr(points: { xIn: number; yIn: number }[], scale: number): string {
   return points.map((p) => `${p.xIn * scale},${p.yIn * scale}`).join(" ");
@@ -215,6 +180,52 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       }
     }
 
+    function snapPosition(pedalId: string, rawXIn: number, rawYIn: number, w: number, h: number) {
+      const prefs = getPrefs();
+      let xIn: number | null = null;
+      let yIn: number | null = null;
+
+      if (prefs.snapNeighbor) {
+        const thresholdIn = SNAP_NEIGHBOR_PX / scale;
+        let bestXDist = thresholdIn;
+        let bestYDist = thresholdIn;
+        for (const [otherId, pos] of livePos) {
+          if (otherId === pedalId) continue;
+          const ofp = footprintByPedalId.get(otherId);
+          if (!ofp) continue;
+          const oLeft = pos.xIn;
+          const oRight = pos.xIn + ofp.w;
+          const oTop = pos.yIn;
+          const oBottom = pos.yIn + ofp.h;
+          for (const target of [oLeft, oRight]) {
+            for (const edgeOffset of [0, w]) {
+              const dist = Math.abs(rawXIn + edgeOffset - target);
+              if (dist < bestXDist) {
+                bestXDist = dist;
+                xIn = target - edgeOffset;
+              }
+            }
+          }
+          for (const target of [oTop, oBottom]) {
+            for (const edgeOffset of [0, h]) {
+              const dist = Math.abs(rawYIn + edgeOffset - target);
+              if (dist < bestYDist) {
+                bestYDist = dist;
+                yIn = target - edgeOffset;
+              }
+            }
+          }
+        }
+      }
+
+      if (prefs.snapGrid) {
+        if (xIn === null) xIn = Math.round(rawXIn / SNAP_GRID_IN) * SNAP_GRID_IN;
+        if (yIn === null) yIn = Math.round(rawYIn / SNAP_GRID_IN) * SNAP_GRID_IN;
+      }
+
+      return { xIn: xIn ?? rawXIn, yIn: yIn ?? rawYIn };
+    }
+
     function updateLivePosition(pedal: PlacedPedal, xIn: number, yIn: number) {
       const lib = pedal.libraryId ? opts.library.get(pedal.libraryId) : null;
       const baseW = lib?.widthIn ?? pedal.custom!.widthIn;
@@ -316,7 +327,13 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
     );
 
     for (const pedal of board.pedals) {
-      const outer = renderPedal(pedal, footprintByPedalId.get(pedal.id)!, initialCollisions.has(pedal.id), updateLivePosition);
+      const outer = renderPedal(
+        pedal,
+        footprintByPedalId.get(pedal.id)!,
+        initialCollisions.has(pedal.id),
+        updateLivePosition,
+        snapPosition
+      );
       pedalEls.set(pedal.id, outer);
       surface.appendChild(outer);
     }
@@ -488,7 +505,8 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
     pedal: PlacedPedal,
     fp: Footprint,
     hasCollision: boolean,
-    updateLivePosition: (pedal: PlacedPedal, xIn: number, yIn: number) => void
+    updateLivePosition: (pedal: PlacedPedal, xIn: number, yIn: number) => void,
+    snapPosition: (pedalId: string, rawXIn: number, rawYIn: number, w: number, h: number) => { xIn: number; yIn: number }
   ) {
     const lib = pedal.libraryId ? opts.library.get(pedal.libraryId) : null;
     const baseW = lib?.widthIn ?? pedal.custom!.widthIn;
@@ -522,6 +540,10 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       },
       [inner]
     );
+
+    if (pedal.notes) {
+      outer.appendChild(el("div", { class: "pedal-notes-dot", title: "Has notes" }));
+    }
 
     let dragStart: { x: number; y: number; origXIn: number; origYIn: number } | null = null;
     let liveXIn = pedal.xIn;
@@ -571,8 +593,9 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       const dyIn = (e.clientY - dragStart.y) / scale;
       if (Math.abs(dxIn) + Math.abs(dyIn) > 0.02) moved = true;
       if (!moved) return;
-      liveXIn = dragStart.origXIn + dxIn;
-      liveYIn = dragStart.origYIn + dyIn;
+      const snapped = snapPosition(pedal.id, dragStart.origXIn + dxIn, dragStart.origYIn + dyIn, fp.w, fp.h);
+      liveXIn = snapped.xIn;
+      liveYIn = snapped.yIn;
       if (!rafPending) {
         rafPending = true;
         requestAnimationFrame(() => {
