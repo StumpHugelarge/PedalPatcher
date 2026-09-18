@@ -72,7 +72,7 @@ async function drawPedal(
   if (img) {
     ctx.drawImage(img, (-baseW * EXPORT_DPI) / 2, (-baseH * EXPORT_DPI) / 2, baseW * EXPORT_DPI, baseH * EXPORT_DPI);
   } else {
-    ctx.fillStyle = cssVar("--panel-sunken");
+    ctx.fillStyle = pedal.custom?.color || cssVar("--panel-sunken");
     ctx.fillRect((-baseW * EXPORT_DPI) / 2, (-baseH * EXPORT_DPI) / 2, baseW * EXPORT_DPI, baseH * EXPORT_DPI);
     ctx.fillStyle = cssVar("--ink");
     ctx.font = "12px Archivo, sans-serif";

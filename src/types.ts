@@ -18,6 +18,7 @@ export interface CustomPedalData {
   widthIn: number;
   heightIn: number;
   image?: string; // full URL, optional
+  color?: string; // hex color for the pedal face, mainly useful when there's no image
 }
 
 export interface PlacedPedal {

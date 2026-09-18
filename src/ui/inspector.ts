@@ -53,7 +53,7 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
       );
 
       const rotateBtn = el("button", { class: "secondary-btn" }, [`Rotate 90° (currently ${pedal.rotation}°)`]);
-      rotateBtn.addEventListener("click", () => store.rotatePedal(pedal.id, nextRotation(pedal.rotation)));
+      rotateBtn.addEventListener("click", () => store.rotatePedal(pedal.id, nextRotation(pedal.rotation), library));
       panel.appendChild(rotateBtn);
 
       panel.appendChild(el("span", { class: "field-label" }, ["Jacks"]));
@@ -96,6 +96,14 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
 
       if (isCustom) {
         panel.appendChild(el("p", { class: "library-hint" }, ["Custom pedal — not part of the imported library."]));
+        panel.appendChild(el("label", { class: "field-label" }, ["Color"]));
+        const customColorInput = el("input", {
+          type: "color",
+          class: "field field-color",
+          value: pedal.custom?.color || "#345170",
+        }) as HTMLInputElement;
+        customColorInput.addEventListener("change", () => store.setCustomPedalColor(pedal.id, customColorInput.value));
+        panel.appendChild(customColorInput);
       }
 
       const copyBtn = el("button", { class: "secondary-btn" }, ["Copy (Ctrl/Cmd+C)"]);

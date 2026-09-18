@@ -301,7 +301,16 @@ a { color: var(--accent-2); }
 
 .library-search {
   margin-bottom: 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
   color: var(--ink);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.library-search, .library-search:focus {
+  -webkit-text-fill-color: var(--ink);
 }
 .library-search::placeholder { color: var(--ink-faint); }
 .library-hint { font-size: 0.82rem; color: var(--ink-faint); }

@@ -338,11 +338,24 @@ class Store {
     this.emit();
   }
 
-  rotatePedal(id: string, rotation: Rotation) {
+  rotatePedal(id: string, rotation: Rotation, library: Map<string, LibraryPedal>) {
     const p = this.getActiveBoard().pedals.find((p) => p.id === id);
     if (!p) return;
     this.snapshotForUndo();
+    // Rotating swaps a pedal's effective width/height (a 90°/270° turn),
+    // but xIn/yIn is always the *top-left* corner of that box — without
+    // recentering here, a rotation silently shifts the pedal's footprint
+    // off its top-left corner instead of turning in place. For a pedal
+    // near the board's edge, that box can end up hanging off the board
+    // permanently (stuck showing the out-of-bounds outline) until moved
+    // by hand. Recomputing xIn/yIn around the same center fixes both.
+    const before = pedalFootprint(p, library);
+    const centerX = p.xIn + before.w / 2;
+    const centerY = p.yIn + before.h / 2;
     p.rotation = rotation;
+    const after = pedalFootprint(p, library);
+    p.xIn = centerX - after.w / 2;
+    p.yIn = centerY - after.h / 2;
     this.emit();
   }
 
@@ -359,6 +372,14 @@ class Store {
     if (!p) return;
     this.snapshotForUndo();
     p.notes = notes.trim() ? notes : undefined;
+    this.emit();
+  }
+
+  setCustomPedalColor(id: string, color: string) {
+    const p = this.getActiveBoard().pedals.find((p) => p.id === id);
+    if (!p || !p.custom) return;
+    this.snapshotForUndo();
+    p.custom.color = color;
     this.emit();
   }
 

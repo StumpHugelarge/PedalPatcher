@@ -116,6 +116,7 @@ export async function createLibraryPanel(root: HTMLElement) {
       const widthInput = el("input", { type: "number", placeholder: "Width (in)", step: "0.05", min: "0.1", class: "field" }) as HTMLInputElement;
       const heightInput = el("input", { type: "number", placeholder: "Height (in)", step: "0.05", min: "0.1", class: "field" }) as HTMLInputElement;
       const imageInput = el("input", { type: "url", placeholder: "Image URL (optional)", class: "field" }) as HTMLInputElement;
+      const colorInput = el("input", { type: "color", class: "field field-color", value: "#345170" }) as HTMLInputElement;
       const error = el("p", { class: "field-error" }, []);
 
       const submit = el("button", { class: "primary-btn" }, ["Add to board"]);
@@ -131,7 +132,7 @@ export async function createLibraryPanel(root: HTMLElement) {
         const board = store.getActiveBoard();
         const { xIn, yIn } = nextDropPosition(board, widthIn, heightIn);
         store.addCustomPedal(
-          { brand, name, widthIn, heightIn, image: imageInput.value.trim() || undefined },
+          { brand, name, widthIn, heightIn, image: imageInput.value.trim() || undefined, color: colorInput.value },
           xIn,
           yIn
         );
@@ -140,7 +141,17 @@ export async function createLibraryPanel(root: HTMLElement) {
       });
 
       section.appendChild(
-        el("div", { class: "custom-form" }, [brandInput, nameInput, widthInput, heightInput, imageInput, error, submit])
+        el("div", { class: "custom-form" }, [
+          brandInput,
+          nameInput,
+          widthInput,
+          heightInput,
+          imageInput,
+          el("label", { class: "field-label" }, ["Color (used when there's no image)"]),
+          colorInput,
+          error,
+          submit,
+        ])
       );
     }
 

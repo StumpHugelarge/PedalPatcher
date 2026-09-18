@@ -518,11 +518,12 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       (store.selection?.type === "pedal" && store.selection.id === pedal.id) ||
       (store.selection?.type === "pedals" && store.selection.ids.includes(pedal.id));
 
+    const customColor = pedal.custom?.color;
     const inner = el(
       "div",
       {
         class: "pedal-face",
-        style: `width:${baseW * scale}px;height:${baseH * scale}px;transform:rotate(${pedal.rotation}deg);`,
+        style: `width:${baseW * scale}px;height:${baseH * scale}px;transform:rotate(${pedal.rotation}deg);${customColor ? `background:${customColor};` : ""}`,
       },
       [
         imageUrl
