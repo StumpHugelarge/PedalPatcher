@@ -1,0 +1,37 @@
+name: Update pedal data
+
+# Weekly check of PedalPlayground's pedal/pedalboard lists. If anything changed,
+# commit the new data (plus public/data/changes.json, which drives the in-app
+# notice) and trigger a deploy. If nothing changed, nothing happens.
+on:
+  schedule:
+    - cron: "17 9 * * 1" # Mondays, 09:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: sync
+        run: node scripts/sync-pedal-data.mjs
+      - name: Commit and deploy
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "Update pedal data from PedalPlayground"
+          git push
+          # Pushes made with the built-in token don't trigger other workflows,
+          # so start the deploy explicitly.
+          gh workflow run deploy.yml --ref main
