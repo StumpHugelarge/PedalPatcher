@@ -12,6 +12,25 @@ export interface LibraryPedal {
 
 export type Rotation = 0 | 90 | 180 | 270;
 
+// The per-pedal jack toggles, as a standalone shape — used to remember a
+// model's jack setup (src/prefs.ts) and to carry it with a saved custom pedal.
+export interface JackOptions {
+  stereoIO?: boolean;
+  midi?: boolean;
+  sendReturn?: boolean;
+  directOut?: boolean;
+  expIn?: boolean;
+}
+
+export const JACK_OPTION_KEYS = ["stereoIO", "midi", "sendReturn", "directOut", "expIn"] as const;
+
+/** Only the jack toggles that are switched on, so "nothing enabled" is an empty object. */
+export function pickJackOptions(source: JackOptions): JackOptions {
+  const out: JackOptions = {};
+  for (const key of JACK_OPTION_KEYS) if (source[key]) out[key] = true;
+  return out;
+}
+
 export interface CustomPedalData {
   brand: string;
   name: string;

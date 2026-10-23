@@ -99,7 +99,7 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
     if (payload.kind === "library") {
       store.addPedalFromLibrary(payload.pedal, xIn, yIn);
     } else {
-      store.addCustomPedal(payload.data, xIn, yIn);
+      store.addCustomPedal(payload.data, xIn, yIn, payload.jacks);
     }
   });
 

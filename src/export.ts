@@ -8,6 +8,14 @@ import { cableStyle } from "./ui/board";
 
 const EXPORT_DPI = 150; // px per inch — independent of whatever on-screen zoom is active
 
+// On-screen sizes (cable stroke, jack dots, fallback label text) are fixed
+// CSS pixels tuned for the app's 100% view of 40 px per inch. The export
+// draws the board at EXPORT_DPI instead, so every one of those pixel sizes
+// has to be multiplied by this same ratio or lines and jacks end up looking
+// several times thinner than they do in the layout view.
+const SCREEN_REFERENCE_PX_PER_IN = 40;
+const PX = EXPORT_DPI / SCREEN_REFERENCE_PX_PER_IN;
+
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -75,10 +83,10 @@ async function drawPedal(
     ctx.fillStyle = pedal.custom?.color || cssVar("--panel-sunken");
     ctx.fillRect((-baseW * EXPORT_DPI) / 2, (-baseH * EXPORT_DPI) / 2, baseW * EXPORT_DPI, baseH * EXPORT_DPI);
     ctx.fillStyle = cssVar("--ink");
-    ctx.font = "12px Archivo, sans-serif";
+    ctx.font = `${9.6 * PX}px Archivo, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${brand} ${name}`, 0, 0, baseW * EXPORT_DPI - 8);
+    ctx.fillText(`${brand} ${name}`, 0, 0, baseW * EXPORT_DPI - 8 * PX);
   }
   ctx.restore();
 }
@@ -95,10 +103,10 @@ function drawJacks(ctx: CanvasRenderingContext2D, fp: Footprint) {
     const isMidi = jack === "midiIn" || jack === "midiOut";
     const isControl = jack === "expIn";
     ctx.beginPath();
-    ctx.arc(pos.xIn * EXPORT_DPI, pos.yIn * EXPORT_DPI, 4, 0, Math.PI * 2);
+    ctx.arc(pos.xIn * EXPORT_DPI, pos.yIn * EXPORT_DPI, 4 * PX, 0, Math.PI * 2);
     ctx.fillStyle = panel;
     ctx.fill();
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2 * PX;
     ctx.strokeStyle = isMidi ? midiColor : isControl ? controlColor : isOut ? outColor : inColor;
     ctx.stroke();
   }
@@ -132,7 +140,7 @@ function drawConnection(
   if (!points) return;
 
   const style = cableStyle(conn.cableType);
-  const scaleFactor = EXPORT_DPI / 40; // dash sizes in cableStyle are tuned for the app's default 40px/in view
+  const scaleFactor = PX; // dash sizes in cableStyle are tuned for the app's default 40px/in view
   ctx.beginPath();
   points.forEach((p, i) => {
     const x = p.xIn * EXPORT_DPI;
@@ -141,7 +149,7 @@ function drawConnection(
     else ctx.lineTo(x, y);
   });
   ctx.setLineDash(parseDash(style.dash, scaleFactor));
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5 * PX; // matches `.connection { stroke-width: 2.5 }` in style.css
   ctx.strokeStyle = style.color.startsWith("var(") ? cssVar(style.color.slice(4, -1)) : style.color;
   ctx.stroke();
   ctx.setLineDash([]);

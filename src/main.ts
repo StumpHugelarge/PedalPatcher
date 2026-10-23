@@ -12,7 +12,7 @@ import { renderBoardToCanvas } from "./export";
 
 // Bumped by hand for each meaningful release — shown next to the title so
 // it's easy to tell at a glance which build is live.
-const APP_VERSION = "v4.1";
+const APP_VERSION = "v4.2";
 
 /** A share link (#share=...) opens straight into a static, non-editable
  * view of just that one board — no toolbar/library/inspector, since

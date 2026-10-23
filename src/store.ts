@@ -1,6 +1,7 @@
 import { makeId } from "./id";
 import { getFootprint, clamp } from "./geometry";
 import { leadPoint, elbowPath, pathLengthIn } from "./cableMath";
+import { getJackPreset, rememberJackPreset } from "./prefs";
 import type {
   Board,
   CableType,
@@ -8,11 +9,13 @@ import type {
   ConnectionMode,
   CustomPedalData,
   JackId,
+  JackOptions,
   LibraryPedal,
   PlacedPedal,
   Project,
   Rotation,
 } from "./types";
+import { pickJackOptions } from "./types";
 
 export type Selection =
   | { type: "pedal"; id: string }
@@ -307,22 +310,26 @@ class Store {
       xIn,
       yIn,
       rotation: 0,
+      // A model whose jacks you've configured before arrives pre-configured.
+      ...getJackPreset(lib.id),
     };
     board.pedals.push(pedal);
     this.state.selection = { type: "pedal", id: pedal.id };
     this.emit();
   }
 
-  addCustomPedal(data: CustomPedalData, xIn: number, yIn: number) {
+  addCustomPedal(data: CustomPedalData, xIn: number, yIn: number, jacks?: JackOptions) {
     this.snapshotForUndo();
     const board = this.getActiveBoard();
     const pedal: PlacedPedal = {
       id: makeId("pedal"),
       libraryId: null,
-      custom: data,
+      // Copied so recoloring a placed pedal never changes the "My pedals" entry it came from.
+      custom: { ...data },
       xIn,
       yIn,
       rotation: 0,
+      ...(jacks ? pickJackOptions(jacks) : {}),
     };
     board.pedals.push(pedal);
     this.state.selection = { type: "pedal", id: pedal.id };
@@ -364,6 +371,8 @@ class Store {
     if (!p) return;
     this.snapshotForUndo();
     Object.assign(p, patch);
+    // Remember this model's jack setup so the next copy you add starts the same way.
+    if (p.libraryId !== null) rememberJackPreset(p.libraryId, p);
     this.emit();
   }
 

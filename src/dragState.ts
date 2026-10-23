@@ -1,8 +1,8 @@
-import type { CustomPedalData, LibraryPedal } from "./types";
+import type { CustomPedalData, JackOptions, LibraryPedal } from "./types";
 
 export type DragPayload =
   | { kind: "library"; pedal: LibraryPedal }
-  | { kind: "custom"; data: CustomPedalData };
+  | { kind: "custom"; data: CustomPedalData; jacks?: JackOptions };
 
 interface DragSession {
   payload: DragPayload;

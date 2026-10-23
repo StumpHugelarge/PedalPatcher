@@ -3,7 +3,10 @@ import { store } from "../store";
 import { connectionLengthIn } from "../store";
 import { nextRotation } from "../geometry";
 import { cableStyle } from "./board";
-import type { CableType, LibraryPedal } from "../types";
+import type { Board, CableType, LibraryPedal } from "../types";
+import { pickJackOptions } from "../types";
+import { saveCustomPedal } from "../prefs";
+import { traceSignalChain } from "../chain";
 import { pedalboardImageUrl } from "../pedalboardData";
 import type { PedalboardPreset } from "../pedalboardData";
 import { CABLE_SLACK_IN, cableSizeLabel, roundUpToStandardCable, buildShoppingList } from "../cableMath";
@@ -80,6 +83,11 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
       );
       panel.appendChild(el("label", { class: "checkbox-field" }, [directOutCheck, " Direct out"]));
       panel.appendChild(el("label", { class: "checkbox-field" }, [expInCheck, " Expression pedal in"]));
+      if (!isCustom) {
+        panel.appendChild(
+          el("p", { class: "library-hint" }, ["Jack choices are remembered for new copies of this model."])
+        );
+      }
 
       panel.appendChild(el("label", { class: "field-label" }, ["Notes"]));
       const notesArea = el(
@@ -104,6 +112,15 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
         }) as HTMLInputElement;
         customColorInput.addEventListener("change", () => store.setCustomPedalColor(pedal.id, customColorInput.value));
         panel.appendChild(customColorInput);
+
+        const saveBtn = el("button", { class: "secondary-btn" }, ["Save to My pedals"]);
+        saveBtn.addEventListener("click", () => {
+          if (!pedal.custom) return;
+          saveCustomPedal(pedal.custom, pickJackOptions(pedal));
+          saveBtn.textContent = "Saved ✓";
+          setTimeout(() => (saveBtn.textContent = "Save to My pedals"), 1500);
+        });
+        panel.appendChild(saveBtn);
       }
 
       const copyBtn = el("button", { class: "secondary-btn" }, ["Copy (Ctrl/Cmd+C)"]);
@@ -296,7 +313,47 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
         ])
       );
     }
+
+    if (board.pedals.length) wrap.appendChild(renderSignalChain(board));
     return wrap;
+  }
+
+  function renderSignalChain(board: Board) {
+    const report = traceSignalChain(board, library);
+    const section = el("div", { class: "chain-section" });
+    section.appendChild(el("label", { class: "field-label" }, ["Signal chain"]));
+
+    if (!report.paths.length && !report.inLoop.length) {
+      section.appendChild(
+        el("p", { class: "library-hint" }, [
+          "No snap-to-jack connections yet — patch pedals together to see the signal order.",
+        ])
+      );
+    }
+
+    for (const path of report.paths) {
+      let text = path.labels[0];
+      for (let i = 1; i < path.labels.length; i++) {
+        const link = path.links[i - 1];
+        text += link ? ` —[${link}]→ ${path.labels[i]}` : ` → ${path.labels[i]}`;
+      }
+      section.appendChild(el("p", { class: "chain-path" }, [text]));
+    }
+
+    const note = (text: string) => section.appendChild(el("p", { class: "chain-note" }, [text]));
+    if (report.truncated) note("Showing the first paths only — this board branches a lot.");
+    if (report.inLoop.length) note(`Feedback loop through: ${report.inLoop.join(", ")}.`);
+    else if (report.hasLoop) note("A feedback loop was found; each path stops where it would go around again.");
+    if (report.isolated.length) note(`Not patched to anything: ${report.isolated.join(", ")}.`);
+    if (report.openJacks.length) {
+      note(`Open jacks: ${report.openJacks.map((o) => `${o.pedal} (${o.jacks.join(", ")})`).join("; ")}.`);
+    }
+    if (report.freeformIgnored) {
+      note(
+        `${report.freeformIgnored} freeform cable${report.freeformIgnored === 1 ? "" : "s"} not traced — only snap-to-jack cables are followed.`
+      );
+    }
+    return section;
   }
 
   render();

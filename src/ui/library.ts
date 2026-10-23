@@ -3,12 +3,15 @@ import { loadPedalLibrary, searchPedals, pedalImageUrl, PEDAL_DATA_SOURCE } from
 import { beginDrag } from "../dragState";
 import { store, nextDropPosition } from "../store";
 import type { LibraryPedal } from "../types";
+import { getSavedPedals, onSavedPedalsChange, removeSavedPedal, saveCustomPedal } from "../prefs";
+import type { SavedPedal } from "../prefs";
 
 export async function createLibraryPanel(root: HTMLElement) {
   const library = await loadPedalLibrary();
 
   let query = "";
   let showCustomForm = false;
+  onSavedPedalsChange(() => render());
 
   const panel = el("div", { class: "library-panel" });
   root.appendChild(panel);
@@ -66,7 +69,56 @@ export async function createLibraryPanel(root: HTMLElement) {
     }
     renderResults();
 
+    panel.appendChild(renderSavedPedals());
     panel.appendChild(renderCustomSection());
+  }
+
+  function renderSavedPedals() {
+    const saved = getSavedPedals();
+    const section = el("div", { class: "saved-section" });
+    if (!saved.length) return section;
+
+    section.appendChild(el("h2", { class: "panel-title" }, ["My pedals"]));
+    for (const entry of saved) section.appendChild(renderSavedCard(entry));
+    return section;
+  }
+
+  function renderSavedCard(entry: SavedPedal) {
+    const { data } = entry;
+    const addBtn = el("button", { class: "library-card-add", title: "Add to the active board" }, ["+"]);
+    addBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const board = store.getActiveBoard();
+      const { xIn, yIn } = nextDropPosition(board, data.widthIn, data.heightIn);
+      store.addCustomPedal(data, xIn, yIn, entry.jacks);
+    });
+    const removeBtn = el("button", { class: "library-card-add library-card-remove", title: "Remove from My pedals" }, ["✕"]);
+    removeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeSavedPedal(entry.id);
+    });
+
+    const thumb = data.image
+      ? el("img", { src: data.image, alt: `${data.brand} ${data.name}`, loading: "lazy", draggable: false })
+      : el("div", { class: "saved-swatch", style: `background:${data.color || "#345170"};` });
+
+    const card = el("div", { class: "library-card saved-card", title: "Drag onto the board, or use the + button" }, [
+      thumb,
+      el("div", { class: "library-card-info" }, [
+        el("span", { class: "library-card-brand" }, [data.brand]),
+        el("span", { class: "library-card-name" }, [data.name]),
+        el("span", { class: "library-card-dims" }, [`${data.widthIn}" × ${data.heightIn}"`]),
+      ]),
+      el("div", { class: "saved-card-actions" }, [addBtn, removeBtn]),
+    ]);
+
+    card.addEventListener("pointerdown", (e) => {
+      const target = e.target as HTMLElement;
+      if (target === addBtn || target === removeBtn) return;
+      beginDrag({ kind: "custom", data, jacks: entry.jacks }, `${data.brand} ${data.name}`, e.clientX, e.clientY);
+    });
+
+    return card;
   }
 
   function renderLibraryCard(pedal: LibraryPedal) {
@@ -117,6 +169,7 @@ export async function createLibraryPanel(root: HTMLElement) {
       const heightInput = el("input", { type: "number", placeholder: "Height (in)", step: "0.05", min: "0.1", class: "field" }) as HTMLInputElement;
       const imageInput = el("input", { type: "url", placeholder: "Image URL (optional)", class: "field" }) as HTMLInputElement;
       const colorInput = el("input", { type: "color", class: "field field-color", value: "#345170" }) as HTMLInputElement;
+      const saveCheck = el("input", { type: "checkbox", checked: true }) as HTMLInputElement;
       const error = el("p", { class: "field-error" }, []);
 
       const submit = el("button", { class: "primary-btn" }, ["Add to board"]);
@@ -131,13 +184,11 @@ export async function createLibraryPanel(root: HTMLElement) {
         }
         const board = store.getActiveBoard();
         const { xIn, yIn } = nextDropPosition(board, widthIn, heightIn);
-        store.addCustomPedal(
-          { brand, name, widthIn, heightIn, image: imageInput.value.trim() || undefined, color: colorInput.value },
-          xIn,
-          yIn
-        );
+        const data = { brand, name, widthIn, heightIn, image: imageInput.value.trim() || undefined, color: colorInput.value };
+        store.addCustomPedal(data, xIn, yIn);
         showCustomForm = false;
-        render();
+        if (saveCheck.checked) saveCustomPedal(data); // re-renders the panel via onSavedPedalsChange
+        else render();
       });
 
       section.appendChild(
@@ -149,6 +200,7 @@ export async function createLibraryPanel(root: HTMLElement) {
           imageInput,
           el("label", { class: "field-label" }, ["Color (used when there's no image)"]),
           colorInput,
+          el("label", { class: "checkbox-field" }, [saveCheck, " Save to My pedals for future projects"]),
           error,
           submit,
         ])
