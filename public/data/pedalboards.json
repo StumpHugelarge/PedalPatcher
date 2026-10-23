@@ -575,24 +575,10 @@
 	},
 	{
 		"Brand": "GigRig",
-		"Name": "Small Single Tier Pedalboard",
-		"Width": 13.03,
-		"Height": 13.18,
-		"Image": "gigrig-small-single-tier.png"
-	},
-	{
-		"Brand": "GigRig",
 		"Name": "Small Wide Tier",
 		"Width": 11.4,
 		"Height": 6.2,
 		"Image": "gigrig-small-wide-tier.png"
-	},
-	{
-		"Brand": "GigRig",
-		"Name": "Wah Riser",
-		"Width": 4.44,
-		"Height": 10.18,
-		"Image": "gigrig-wah-riser.png"
 	},
 	{
 		"Brand": "Gokko",
@@ -663,8 +649,8 @@
 		"Width": 31.5,
 		"Height": 15.35,
 		"Image": "harley-benton-spaceship-80.png"
-	},
-	{
+  },
+  {
 		"Brand": "Holeyboard",
 		"Name": "Mini",
 		"Width": 13,
@@ -758,120 +744,120 @@
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Front Flat 16",
-		"Width": 16,
-		"Height": 6,
+		"Width": 16.0,
+		"Height": 6.0,
 		"Image": "morton-front-flat-16.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Front Flat 8",
-		"Width": 8,
-		"Height": 6,
+		"Width": 8.0,
+		"Height": 6.0,
 		"Image": "morton-front-flat-8.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Front Slant 16",
-		"Width": 16,
-		"Height": 6,
+		"Width": 16.0,
+		"Height": 6.0,
 		"Image": "morton-front-slant-16.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Front Slant 8",
-		"Width": 8,
-		"Height": 6,
+		"Width": 8.0,
+		"Height": 6.0,
 		"Image": "morton-front-slant-8.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Front Tray 16",
-		"Width": 16,
-		"Height": 5,
+		"Width": 16.0,
+		"Height": 5.0,
 		"Image": "morton-front-tray-16.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Front Tray 20",
-		"Width": 20,
-		"Height": 7,
+		"Width": 20.0,
+		"Height": 7.0,
 		"Image": "morton-front-tray-20.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Long Flat 4",
-		"Width": 4,
-		"Height": 12,
+		"Width": 4.0,
+		"Height": 12.0,
 		"Image": "morton-long-flat-4.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Long Flat 8",
-		"Width": 8,
-		"Height": 12,
+		"Width": 8.0,
+		"Height": 12.0,
 		"Image": "morton-long-flat-8.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Long Slant 16",
-		"Width": 16,
-		"Height": 12,
+		"Width": 16.0,
+		"Height": 12.0,
 		"Image": "morton-long-slant-16.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Long Slant 4",
-		"Width": 4,
-		"Height": 12,
+		"Width": 4.0,
+		"Height": 12.0,
 		"Image": "morton-long-slant-4.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Long Slant 8",
-		"Width": 8,
-		"Height": 12,
+		"Width": 8.0,
+		"Height": 12.0,
 		"Image": "morton-long-slant-8.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Rear Flat 16",
-		"Width": 16,
-		"Height": 6,
+		"Width": 16.0,
+		"Height": 6.0,
 		"Image": "morton-rear-flat-16.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Rear Flat 8",
-		"Width": 8,
-		"Height": 6,
+		"Width": 8.0,
+		"Height": 6.0,
 		"Image": "morton-rear-flat-8.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Rear Slant 16",
-		"Width": 16,
-		"Height": 6,
+		"Width": 16.0,
+		"Height": 6.0,
 		"Image": "morton-rear-slant-16.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Rear Slant 8",
-		"Width": 8,
-		"Height": 6,
+		"Width": 8.0,
+		"Height": 6.0,
 		"Image": "morton-rear-slant-8.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Side Tray 4",
 		"Width": 4.6,
-		"Height": 12,
+		"Height": 12.0,
 		"Image": "morton-side-tray-4.png"
 	},
 	{
 		"Brand": "Morton Pedalboards",
 		"Name": "Side Tray 8",
 		"Width": 8.6,
-		"Height": 12,
+		"Height": 12.0,
 		"Image": "morton-side-tray-8.png"
 	},
 	{
@@ -1130,7 +1116,7 @@
 		"Brand": "Pedaltrain",
 		"Name": "Nano+",
 		"Width": 18,
-		"Height": 5,
+		"Height": 5.5,
 		"Image": "pedaltrain-nanoplus.png"
 	},
 	{
@@ -1496,27 +1482,6 @@
 		"Width": 17.63,
 		"Height": 12.33,
 		"Image": "skb-injection-molded.png"
-	},
-	{
-		"Brand": "Sonicake",
-		"Name": "L Pedalboard",
-		"Width": 18.11,
-		"Height": 12.72,
-		"Image": "sonicake-l-pedalboard.png"
-	},
-	{
-		"Brand": "Sonicake",
-		"Name": "M Pedalboard",
-		"Width": 14.96,
-		"Height": 11.42,
-		"Image": "sonicake-m-pedalboard.png"
-	},
-	{
-		"Brand": "Sonicake",
-		"Name": "S Pedalboard",
-		"Width": 14.17,
-		"Height": 5.71,
-		"Image": "sonicake-s-pedalboard.png"
 	},
 	{
 		"Brand": "Stompbox EX",

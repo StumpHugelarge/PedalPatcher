@@ -43,7 +43,7 @@ Because images are fetched live from GitHub's raw content host, they require nor
 
 ## Known v0 limitations
 
-- Stereo I/O and MIDI jacks are a per-pedal on/off toggle at fixed positions (2nd input/output on the left/right edges, MIDI in/out on the top edge), not real per-model jack data — Pedal Playground's dataset doesn't include jack layouts. Power jacks still aren't modeled; draw those as freeform lines.
+- Stereo I/O and MIDI jacks are a per-pedal on/off toggle at fixed positions (inputs on a pedal's right edge and outputs on its left, like a real pedal seen from above; the 2nd input/output sit on the same edges, MIDI in/out on the top edge), not real per-model jack data — Pedal Playground's dataset doesn't include jack layouts. Power jacks still aren't modeled; draw those as freeform lines.
 - A snapped connection's right-angle route has one adjustable bend (drag the handle left/right); it doesn't automatically route around pedals in its path — you dodge them by hand.
 - Dragging one pedal in a multi-pedal selection moves only that pedal, not the whole group.
 - Freeform lines are a single straight segment between two points, not multi-point polylines.

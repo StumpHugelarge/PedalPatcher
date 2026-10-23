@@ -103,8 +103,8 @@ export function traceSignalChain(board: Board, library: Map<string, LibraryPedal
 
   const isolated = board.pedals.filter((p) => !connectedJacks.has(p.id)).map((p) => labelOf.get(p.id)!);
 
-  // Chains read left to right, the way signal usually runs on a board.
-  const byPosition = [...board.pedals].sort((a, b) => a.xIn - b.xIn || a.yIn - b.yIn);
+  // Chains are listed right to left, the way signal runs on a board (inputs sit on a pedal's right).
+  const byPosition = [...board.pedals].sort((a, b) => b.xIn - a.xIn || a.yIn - b.yIn);
   const starts = byPosition.filter((p) => audioConnected.has(p.id) && !hasIncomingMain.has(p.id));
 
   const paths: ChainPath[] = [];

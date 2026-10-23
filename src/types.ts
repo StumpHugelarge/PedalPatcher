@@ -59,7 +59,7 @@ export interface PlacedPedal {
   notes?: string; // free-text personal notes (settings, model, reminders), not from the library data
 }
 
-// Every pedal always has in1/out1. stereoIO adds in2/out2 on the left/right
+// Every pedal always has in1/out1. stereoIO adds in2/out2 on the right/left
 // edges next to them. All other extras — MIDI, send/return, direct out,
 // expression in — share the top edge, evenly spaced across however many of
 // them are active on a given pedal, matching where these jacks usually

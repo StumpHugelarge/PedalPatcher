@@ -36,11 +36,11 @@ const TOP_EDGE_JACKS: { id: JackId; optKey: keyof FootprintOptions; count: 1 | 2
  * Jack layout is computed in the pedal's own unrotated (rotation-0) frame
  * first, then carried through rotation by a single shared mapping — this
  * keeps the in1/out1 result identical to the old hardcoded per-rotation
- * math (in1 on the left edge / mid-height, out1 on the right edge / mid-
+ * math (in1 on the right edge / mid-height, out1 on the left edge / mid-
  * height) while letting extra jacks reuse the same rotation logic instead
  * of a duplicated switch per jack.
  *
- * in1/in2/out1/out2 sit on the left/right edges (mirroring real stereo
+ * in1/in2 sit on the right edge and out1/out2 on the left edge (mirroring real stereo
  * in/out pairs). Every other extra — MIDI, send/return, direct out,
  * expression in — sits on the top edge, evenly spaced across however many
  * of them are active, matching where these usually sit on real pedals.
@@ -55,20 +55,20 @@ export function getFootprint(
 ): Footprint {
   const local: Partial<Record<JackId, { xIn: number; yIn: number }>> = opts.stereoIO
     ? {
-        in1: { xIn: 0, yIn: baseH / 3 },
-        in2: { xIn: 0, yIn: (baseH * 2) / 3 },
-        out1: { xIn: baseW, yIn: baseH / 3 },
-        out2: { xIn: baseW, yIn: (baseH * 2) / 3 },
+        in1: { xIn: baseW, yIn: baseH / 3 },
+        in2: { xIn: baseW, yIn: (baseH * 2) / 3 },
+        out1: { xIn: 0, yIn: baseH / 3 },
+        out2: { xIn: 0, yIn: (baseH * 2) / 3 },
       }
     : {
-        in1: { xIn: 0, yIn: baseH / 2 },
-        out1: { xIn: baseW, yIn: baseH / 2 },
+        in1: { xIn: baseW, yIn: baseH / 2 },
+        out1: { xIn: 0, yIn: baseH / 2 },
       };
   const localDirs: Partial<Record<JackId, { dxIn: number; dyIn: number }>> = {
-    in1: { dxIn: -1, dyIn: 0 },
-    in2: { dxIn: -1, dyIn: 0 },
-    out1: { dxIn: 1, dyIn: 0 },
-    out2: { dxIn: 1, dyIn: 0 },
+    in1: { dxIn: 1, dyIn: 0 },
+    in2: { dxIn: 1, dyIn: 0 },
+    out1: { dxIn: -1, dyIn: 0 },
+    out2: { dxIn: -1, dyIn: 0 },
   };
 
   const activeTopSlots = TOP_EDGE_JACKS.filter((slot) => opts[slot.optKey]).flatMap((slot) =>
