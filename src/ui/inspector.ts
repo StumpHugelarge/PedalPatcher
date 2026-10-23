@@ -332,21 +332,22 @@ export function createInspector(root: HTMLElement, library: Map<string, LibraryP
     }
 
     for (const path of report.paths) {
-      let text = path.labels[0];
-      for (let i = 1; i < path.labels.length; i++) {
-        const link = path.links[i - 1];
-        text += link ? ` —[${link}]→ ${path.labels[i]}` : ` → ${path.labels[i]}`;
-      }
+      const text = path.steps.join(" → ");
       section.appendChild(el("p", { class: "chain-path" }, [text]));
     }
 
     const note = (text: string) => section.appendChild(el("p", { class: "chain-note" }, [text]));
     if (report.truncated) note("Showing the first paths only — this board branches a lot.");
     if (report.inLoop.length) note(`Feedback loop through: ${report.inLoop.join(", ")}.`);
-    else if (report.hasLoop) note("A feedback loop was found; each path stops where it would go around again.");
+    else if (report.hasLoop) note("A feedback loop was found (signal routed back through a normal input); each path stops where it would go around again.");
     if (report.isolated.length) note(`Not patched to anything: ${report.isolated.join(", ")}.`);
     if (report.openJacks.length) {
       note(`Open jacks: ${report.openJacks.map((o) => `${o.pedal} (${o.jacks.join(", ")})`).join("; ")}.`);
+    }
+    if (report.nonAudioIgnored) {
+      note(
+        `${report.nonAudioIgnored} MIDI / expression cable${report.nonAudioIgnored === 1 ? "" : "s"} not shown — only audio cables are in the chain.`
+      );
     }
     if (report.freeformIgnored) {
       note(

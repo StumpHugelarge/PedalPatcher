@@ -1,5 +1,5 @@
 import type { Board, JackId, LibraryPedal, PlacedPedal } from "./types";
-import { JACK_LABEL, JACK_ROLE } from "./types";
+import { JACK_FAMILY, JACK_LABEL, JACK_ROLE } from "./types";
 import { pedalFootprint } from "./store";
 
 // Traces the board's snap-to-jack connections into readable signal paths.
@@ -7,17 +7,17 @@ import { pedalFootprint } from "./store";
 // and they're only counted, not traced.
 
 export interface ChainPath {
-  labels: string[]; // pedal names, in signal order
-  links: string[]; // links[i] sits between labels[i] and labels[i + 1]; "" for a plain output -> input patch
+  steps: string[]; // in signal order: pedal names, plus "Send from X" / "Return to X" markers
 }
 
 export interface ChainReport {
   paths: ChainPath[];
   isolated: string[]; // pedals with no snapped connection at all
   openJacks: { pedal: string; jacks: string[] }[]; // switched-on jacks nothing is plugged into
-  inLoop: string[]; // pedals that only appear in a feedback loop
+  inLoop: string[]; // pedals reachable only through a true feedback loop
   hasLoop: boolean;
   freeformIgnored: number;
+  nonAudioIgnored: number; // MIDI / expression cables, which aren't part of the audio path
   truncated: boolean; // path list was capped (very branchy boards)
 }
 
@@ -36,6 +36,13 @@ interface Edge {
   toJack: JackId;
 }
 
+// Rules:
+//  - A chain starts at a patched pedal whose main input has no cable and ends at
+//    the pedal whose main output has no cable.
+//  - Signal leaves a pedal by its Output. If the pedal's Send is patched, signal
+//    detours out the Send, follows that cable chain, and re-enters the same pedal
+//    at its Return, then carries on from the Output.
+//  - Only audio cables are traced; MIDI / expression cables are just counted.
 export function traceSignalChain(board: Board, library: Map<string, LibraryPedal>): ChainReport {
   // Labels, with " #2", " #3"... added when the same model is on the board more than once.
   const rawLabels = new Map(board.pedals.map((p) => [p.id, pedalLabel(p, library)]));
@@ -51,10 +58,13 @@ export function traceSignalChain(board: Board, library: Map<string, LibraryPedal
   }
 
   const pedalIds = new Set(board.pedals.map((p) => p.id));
-  const outgoing = new Map<string, Edge[]>();
-  const incomingCount = new Map<string, number>();
+  // outgoing.get(pedalId).get(jack) = cables leaving that output-type jack
+  const outgoing = new Map<string, Map<JackId, Edge[]>>();
   const connectedJacks = new Map<string, Set<JackId>>();
+  const audioConnected = new Set<string>();
+  const hasIncomingMain = new Set<string>(); // an audio cable lands on in1/in2
   let freeformIgnored = 0;
+  let nonAudioIgnored = 0;
 
   const markJack = (pedalId: string, jack: JackId) => {
     if (!connectedJacks.has(pedalId)) connectedJacks.set(pedalId, new Set());
@@ -68,89 +78,128 @@ export function traceSignalChain(board: Board, library: Map<string, LibraryPedal
     }
     if (!pedalIds.has(conn.from.pedalId) || !pedalIds.has(conn.to.pedalId)) continue;
 
+    markJack(conn.from.pedalId, conn.from.jack);
+    markJack(conn.to.pedalId, conn.to.jack);
+
+    if (JACK_FAMILY[conn.from.jack] !== "audio" || JACK_FAMILY[conn.to.jack] !== "audio") {
+      nonAudioIgnored++;
+      continue;
+    }
+
     // Patching is unrestricted, so the cable may have been drawn input-first.
-    // Signal flows out of an "out" jack into an "in" jack; if the roles tie
-    // (out-to-out, in-to-in), fall back to the direction it was drawn in.
     const flip = JACK_ROLE[conn.from.jack] === "in" && JACK_ROLE[conn.to.jack] === "out";
     const src = flip ? conn.to : conn.from;
     const dst = flip ? conn.from : conn.to;
 
-    if (!outgoing.has(src.pedalId)) outgoing.set(src.pedalId, []);
-    outgoing.get(src.pedalId)!.push({ toPedalId: dst.pedalId, fromJack: src.jack, toJack: dst.jack });
-    incomingCount.set(dst.pedalId, (incomingCount.get(dst.pedalId) ?? 0) + 1);
-    markJack(src.pedalId, src.jack);
-    markJack(dst.pedalId, dst.jack);
+    if (!outgoing.has(src.pedalId)) outgoing.set(src.pedalId, new Map());
+    const byJack = outgoing.get(src.pedalId)!;
+    if (!byJack.has(src.jack)) byJack.set(src.jack, []);
+    byJack.get(src.jack)!.push({ toPedalId: dst.pedalId, fromJack: src.jack, toJack: dst.jack });
+
+    audioConnected.add(src.pedalId);
+    audioConnected.add(dst.pedalId);
+    if (dst.jack === "in1" || dst.jack === "in2") hasIncomingMain.add(dst.pedalId);
   }
 
-  const hasConnection = (id: string) => connectedJacks.has(id);
-  const isolated = board.pedals.filter((p) => !hasConnection(p.id)).map((p) => labelOf.get(p.id)!);
+  const isolated = board.pedals.filter((p) => !connectedJacks.has(p.id)).map((p) => labelOf.get(p.id)!);
 
   // Chains read left to right, the way signal usually runs on a board.
   const byPosition = [...board.pedals].sort((a, b) => a.xIn - b.xIn || a.yIn - b.yIn);
-  const starts = byPosition.filter((p) => hasConnection(p.id) && !(incomingCount.get(p.id) ?? 0));
+  const starts = byPosition.filter((p) => audioConnected.has(p.id) && !hasIncomingMain.has(p.id));
 
   const paths: ChainPath[] = [];
   const visited = new Set<string>();
   let hasLoop = false;
   let truncated = false;
 
-  const linkText = (e: Edge) =>
-    e.fromJack === "out1" && e.toJack === "in1" ? "" : `${JACK_LABEL[e.fromJack]} → ${JACK_LABEL[e.toJack]}`;
+  const MAIN_OUTS: JackId[] = ["out1", "out2", "directOut"];
 
-  function walk(pedalId: string, labels: string[], links: string[], onPath: Set<string>) {
+  // `via` is the jack the signal arrived on.
+  function walk(
+    pedalId: string,
+    via: JackId,
+    steps: string[],
+    onPath: Set<string>,
+    openSends: Set<string>
+  ) {
     if (paths.length >= MAX_PATHS) {
       truncated = true;
       return;
     }
-    visited.add(pedalId);
-    labels.push(labelOf.get(pedalId)!);
-    onPath.add(pedalId);
+    const label = labelOf.get(pedalId)!;
+    const returning = via === "return";
 
-    const edges = (outgoing.get(pedalId) ?? []).filter((e) => {
-      if (onPath.has(e.toPedalId)) {
-        hasLoop = true; // feedback loop: don't follow it around again
-        return false;
+    if (returning) {
+      // Only valid when we're inside this pedal's own send loop.
+      if (!openSends.has(pedalId)) {
+        hasLoop = true;
+        return;
       }
-      return true;
-    });
+    } else if (onPath.has(pedalId)) {
+      hasLoop = true; // true feedback loop: don't go around again
+      return;
+    }
 
-    if (!edges.length) {
-      paths.push({ labels: [...labels], links: [...links] });
+    visited.add(pedalId);
+    const pushed: string[] = [returning ? `Return to ${label}` : label];
+    if (!returning) onPath.add(pedalId);
+
+    const jacks = outgoing.get(pedalId);
+    let nextEdges: Edge[] = [];
+    let enteringSend = false;
+
+    if (!returning && jacks?.get("send")?.length) {
+      enteringSend = true;
+      nextEdges = jacks.get("send")!;
+      pushed.push(`Send from ${label}`);
     } else {
-      for (const edge of edges) {
-        links.push(linkText(edge));
-        walk(edge.toPedalId, labels, links, onPath);
-        links.pop();
+      for (const jack of MAIN_OUTS) {
+        const edges = jacks?.get(jack) ?? [];
+        if (!edges.length) continue;
+        nextEdges.push(...edges);
       }
     }
 
-    onPath.delete(pedalId);
-    labels.pop();
+    steps.push(...pushed);
+    const nextOpen = new Set(openSends);
+    if (enteringSend) nextOpen.add(pedalId);
+    if (returning) nextOpen.delete(pedalId);
+
+    if (!nextEdges.length) {
+      paths.push({ steps: [...steps] });
+    } else {
+      for (const edge of nextEdges) {
+        const extra = edge.fromJack !== "out1" && edge.fromJack !== "send" ? `${JACK_LABEL[edge.fromJack]} from ${label}` : null;
+        if (extra) steps.push(extra);
+        walk(edge.toPedalId, edge.toJack, steps, onPath, nextOpen);
+        if (extra) steps.pop();
+      }
+    }
+
+    steps.length -= pushed.length;
+    if (!returning) onPath.delete(pedalId);
   }
 
-  for (const start of starts) walk(start.id, [], [], new Set());
+  for (const start of starts) walk(start.id, "in1", [], new Set(), new Set());
 
-  // Pedals that are patched but never reached from a start can only be inside a loop.
-  const inLoop = byPosition.filter((p) => hasConnection(p.id) && !visited.has(p.id)).map((p) => labelOf.get(p.id)!);
+  // Patched pedals never reached from a start can only be inside a true loop.
+  const inLoop = byPosition.filter((p) => audioConnected.has(p.id) && !visited.has(p.id)).map((p) => labelOf.get(p.id)!);
   if (inLoop.length) hasLoop = true;
 
-  // Switched-on jacks nothing is plugged into. The open ends of a chain are
-  // normal — the first pedal's main input (your guitar) and the last pedal's
-  // main output (your amp) — so those aren't listed.
+  // Switched-on jacks nothing is plugged into. The chain's open ends are normal:
+  // a main input with no cable is where the chain begins (your guitar), and a
+  // main output with no cable is where it ends (your amp), so those aren't listed.
   const openJacks: { pedal: string; jacks: string[] }[] = [];
   for (const p of byPosition) {
-    if (!hasConnection(p.id)) continue; // already reported as not connected
-    const plugged = connectedJacks.get(p.id)!;
-    const isStart = !(incomingCount.get(p.id) ?? 0);
-    const isEnd = !(outgoing.get(p.id)?.length ?? 0);
+    const plugged = connectedJacks.get(p.id);
+    if (!plugged) continue; // already reported as not connected
     const open = (Object.keys(pedalFootprint(p, library).jacks) as JackId[]).filter((jack) => {
       if (plugged.has(jack)) return false;
-      if (isStart && jack === "in1") return false;
-      if (isEnd && jack === "out1") return false;
+      if (jack === "in1" || jack === "out1") return false;
       return true;
     });
     if (open.length) openJacks.push({ pedal: labelOf.get(p.id)!, jacks: open.map((j) => JACK_LABEL[j]) });
   }
 
-  return { paths, isolated, openJacks, inLoop, hasLoop, freeformIgnored, truncated };
+  return { paths, isolated, openJacks, inLoop, hasLoop, freeformIgnored, nonAudioIgnored, truncated };
 }
