@@ -9,10 +9,11 @@ import { createInspector } from "./ui/inspector";
 import { createToolbar } from "./ui/toolbar";
 import { readSharedBoardFromLocation } from "./shareLink";
 import { renderBoardToCanvas } from "./export";
+import { showDataUpdateNotice } from "./updateNotice";
 
 // Bumped by hand for each meaningful release — shown next to the title so
 // it's easy to tell at a glance which build is live.
-const APP_VERSION = "v4.3";
+const APP_VERSION = "v4.4";
 
 /** A share link (#share=...) opens straight into a static, non-editable
  * view of just that one board — no toolbar/library/inspector, since
@@ -97,6 +98,7 @@ async function main() {
   renderAll();
 
   store.subscribe(renderAll);
+  void showDataUpdateNotice();
 
   window.addEventListener("keydown", (e) => {
     const target = e.target as HTMLElement;
