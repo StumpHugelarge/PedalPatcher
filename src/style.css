@@ -11,6 +11,7 @@
   --accent-2: #345170;
   --good: #3f7d4c;
   --bad: #b3413f;
+  --guide: #d13ea3;
   --radius: 4px;
 }
 
@@ -28,6 +29,7 @@
     --accent-2: #86adcb;
     --good: #6fbe7c;
     --bad: #e08683;
+    --guide: #ec6cc4;
   }
 }
 
@@ -503,6 +505,19 @@ a { color: var(--accent-2); }
   pointer-events: none;
   z-index: 4;
 }
+
+/* Shown only mid-drag, as a cue for which neighbor edge snap-to-neighbor
+   just matched on a given axis — see snapPosition()/updateSnapGuides() in
+   src/ui/board.ts. Hidden by default; display is toggled inline. */
+.snap-guide {
+  position: absolute;
+  background: var(--guide);
+  pointer-events: none;
+  z-index: 6;
+  display: none;
+}
+.snap-guide-v { top: 0; bottom: 0; width: 1px; }
+.snap-guide-h { left: 0; right: 0; height: 1px; }
 
 /* ---- inspector ---- */
 

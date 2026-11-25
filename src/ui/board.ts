@@ -184,6 +184,12 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       const prefs = getPrefs();
       let xIn: number | null = null;
       let yIn: number | null = null;
+      // The board-space coordinate of the neighbor edge a given axis snapped
+      // to, if any — drawn as a full-span guide line so the snap is visible
+      // instead of the pedal just silently jumping (grid snapping has no
+      // single line to show, so it doesn't set these).
+      let xGuide: number | null = null;
+      let yGuide: number | null = null;
 
       if (prefs.snapNeighbor) {
         const thresholdIn = SNAP_NEIGHBOR_PX / scale;
@@ -203,6 +209,7 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
               if (dist < bestXDist) {
                 bestXDist = dist;
                 xIn = target - edgeOffset;
+                xGuide = target;
               }
             }
           }
@@ -212,6 +219,7 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
               if (dist < bestYDist) {
                 bestYDist = dist;
                 yIn = target - edgeOffset;
+                yGuide = target;
               }
             }
           }
@@ -223,7 +231,22 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
         if (yIn === null) yIn = Math.round(rawYIn / SNAP_GRID_IN) * SNAP_GRID_IN;
       }
 
-      return { xIn: xIn ?? rawXIn, yIn: yIn ?? rawYIn };
+      return { xIn: xIn ?? rawXIn, yIn: yIn ?? rawYIn, xGuide, yGuide };
+    }
+
+    // Shown only while dragging, as a cue for *why* a pedal just snapped
+    // into place — a full-span line at the neighbor edge it matched on that
+    // axis, hidden again on drag end or once nothing matches.
+    const xGuideEl = el("div", { class: "snap-guide snap-guide-v" });
+    const yGuideEl = el("div", { class: "snap-guide snap-guide-h" });
+    surface.appendChild(xGuideEl);
+    surface.appendChild(yGuideEl);
+
+    function updateSnapGuides(xGuide: number | null, yGuide: number | null) {
+      xGuideEl.style.display = xGuide === null ? "none" : "block";
+      if (xGuide !== null) xGuideEl.style.left = `${xGuide * scale}px`;
+      yGuideEl.style.display = yGuide === null ? "none" : "block";
+      if (yGuide !== null) yGuideEl.style.top = `${yGuide * scale}px`;
     }
 
     function updateLivePosition(pedal: PlacedPedal, xIn: number, yIn: number) {
@@ -332,7 +355,8 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
         footprintByPedalId.get(pedal.id)!,
         initialCollisions.has(pedal.id),
         updateLivePosition,
-        snapPosition
+        snapPosition,
+        updateSnapGuides
       );
       pedalEls.set(pedal.id, outer);
       surface.appendChild(outer);
@@ -506,7 +530,14 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
     fp: Footprint,
     hasCollision: boolean,
     updateLivePosition: (pedal: PlacedPedal, xIn: number, yIn: number) => void,
-    snapPosition: (pedalId: string, rawXIn: number, rawYIn: number, w: number, h: number) => { xIn: number; yIn: number }
+    snapPosition: (
+      pedalId: string,
+      rawXIn: number,
+      rawYIn: number,
+      w: number,
+      h: number
+    ) => { xIn: number; yIn: number; xGuide: number | null; yGuide: number | null },
+    updateSnapGuides: (xGuide: number | null, yGuide: number | null) => void
   ) {
     const lib = pedal.libraryId ? opts.library.get(pedal.libraryId) : null;
     const baseW = lib?.widthIn ?? pedal.custom!.widthIn;
@@ -597,6 +628,7 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
       const snapped = snapPosition(pedal.id, dragStart.origXIn + dxIn, dragStart.origYIn + dyIn, fp.w, fp.h);
       liveXIn = snapped.xIn;
       liveYIn = snapped.yIn;
+      updateSnapGuides(snapped.xGuide, snapped.yGuide);
       if (!rafPending) {
         rafPending = true;
         requestAnimationFrame(() => {
@@ -617,6 +649,7 @@ export function createBoardView(root: HTMLElement, opts: BoardViewOptions) {
         store.select({ type: "pedal", id: pedal.id });
       }
       dragStart = null;
+      updateSnapGuides(null, null);
     }
 
     outer.addEventListener("pointerup", endDrag);
